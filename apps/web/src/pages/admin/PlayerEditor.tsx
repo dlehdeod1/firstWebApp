@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from "@/lib/api";\r
 import {
     Users,
     Search,
@@ -11,9 +12,9 @@ import {
     LayoutList,
     Link as LinkIcon,
 } from 'lucide-react';
+import { API_URL } from "@/lib/api";\r
 import { cn } from '@/lib/utils';
-
-const API_URL = 'http://localhost:8787';
+import { API_URL } from "@/lib/api";\r
 
 interface Player {
     id: number;
@@ -53,7 +54,7 @@ const DEFAULT_STATS = {
 
 
 /* -------------------------------------------------------------------------- */
-/* StatCell – table cell with a numeric input                                 */
+/* StatCell ??table cell with a numeric input                                 */
 /* -------------------------------------------------------------------------- */
 const StatCell = ({
     value,
@@ -104,7 +105,7 @@ export default function PlayerEditor() {
     const [viewMode, setViewMode] = useState<'table' | 'card'>('card'); // Default to card for mobile
 
     /* ---------------------------------------------------------------------- */
-    /* Effect – fetch data & determine role                                    */
+    /* Effect ??fetch data & determine role                                    */
     /* ---------------------------------------------------------------------- */
     useEffect(() => {
         fetchPlayers();
@@ -241,11 +242,11 @@ export default function PlayerEditor() {
                 },
             );
             if (res.ok) {
-                alert('연결되었습니다.');
+                alert('?�결?�었?�니??');
                 fetchPlayers();
             } else {
                 const err = await res.json();
-                alert(err.error || '연결에 실패했습니다.');
+                alert(err.error || '?�결???�패?�습?�다.');
             }
         } catch (e) {
             console.error(e);
@@ -263,10 +264,10 @@ export default function PlayerEditor() {
                 },
             );
             if (res.ok) {
-                alert('연결이 해제되었습니다.');
+                alert('?�결???�제?�었?�니??');
                 fetchPlayers();
             } else {
-                alert('해제에 실패했습니다.');
+                alert('?�제???�패?�습?�다.');
             }
         } catch (e) {
             console.error(e);
@@ -274,7 +275,7 @@ export default function PlayerEditor() {
     };
 
     const handleDelete = async (playerId: number) => {
-        if (!confirm('정말 삭제하시겠습니까?')) return;
+        if (!confirm('?�말 ??��?�시겠습?�까?')) return;
         const token = localStorage.getItem('auth_token');
         try {
             const res = await fetch(`${API_URL}/players/${playerId}`, {
@@ -282,10 +283,10 @@ export default function PlayerEditor() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
-                alert('삭제되었습니다.');
+                alert('??��?�었?�니??');
                 fetchPlayers();
             } else {
-                alert('삭제에 실패했습니다.');
+                alert('??��???�패?�습?�다.');
             }
         } catch (e) {
             console.error(e);
@@ -300,7 +301,7 @@ export default function PlayerEditor() {
         // I restored PUT /players/:id, so we can use concurrent requests.
 
         if (Object.keys(modified).length === 0) return;
-        if (!confirm(`${Object.keys(modified).length}명의 데이터를 저장하시겠습니까?`)) return;
+        if (!confirm(`${Object.keys(modified).length}명의 ?�이?��? ?�?�하?�겠?�니�?`)) return;
 
         try {
             await Promise.all(updates.map(p =>
@@ -313,12 +314,12 @@ export default function PlayerEditor() {
                     body: JSON.stringify(p)
                 })
             ));
-            alert('저장되었습니다.');
+            alert('?�?�되?�습?�다.');
             setModified({});
             fetchPlayers();
         } catch (e) {
             console.error(e);
-            alert('일부 저장 실패');
+            alert('?��? ?�???�패');
         }
     };
 
@@ -357,13 +358,13 @@ export default function PlayerEditor() {
                 body: JSON.stringify(editing),
             });
             if (res.ok) {
-                alert(isNew ? '생성되었습니다.' : '수정되었습니다.');
+                alert(isNew ? '?�성?�었?�니??' : '?�정?�었?�니??');
                 setIsNew(false);
                 setEditing(null);
                 fetchPlayers();
             } else {
                 const err = await res.json();
-                alert(err.error || '저장에 실패했습니다.');
+                alert(err.error || '?�?�에 ?�패?�습?�다.');
             }
         } catch (e) {
             console.error(e);
@@ -384,7 +385,7 @@ export default function PlayerEditor() {
     /* ---------------------------------------------------------------------- */
     // [FIX] Block Flash of Content: Wait for BOTH loading and roleLoaded
     if (loading || !roleLoaded) {
-        return <div className="p-20 text-center text-slate-500 animate-pulse">데이터 및 권한 로딩 중...</div>
+        return <div className="p-20 text-center text-slate-500 animate-pulse">?�이??�?권한 로딩 �?..</div>
     }
 
     if (!canView) {
@@ -394,10 +395,10 @@ export default function PlayerEditor() {
                     <Users size={32} />
                 </div>
                 <h2 className="text-2xl font-bold text-slate-800 mb-2">
-                    접근 권한이 없습니다.
+                    ?�근 권한???�습?�다.
                 </h2>
                 <p className="text-slate-500 mb-4">
-                    구단주 또는 관리자 계정으로 로그인해주세요.
+                    구단�??�는 관리자 계정?�로 로그?�해주세??
                 </p>
                 <div className="text-xs text-slate-400 bg-slate-100 p-2 rounded text-left">
                     <p>DEBUG INFO:</p>
@@ -424,10 +425,10 @@ export default function PlayerEditor() {
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 flex items-center gap-2 mb-1">
-                    <Users className="text-blue-600" size={28} /> 선수 관리
+                    <Users className="text-blue-600" size={28} /> ?�수 관�?
                 </h1>
                 <p className="text-sm text-slate-500">
-                    {filteredPlayers.length}명의 선수 · 능력치 수정 및 계정 연결
+                    {filteredPlayers.length}명의 ?�수 · ?�력�??�정 �?계정 ?�결
                 </p>
             </div>
 
@@ -439,7 +440,7 @@ export default function PlayerEditor() {
                         <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
                         <input
                             type="text"
-                            placeholder="이름 검색..."
+                            placeholder="?�름 검??.."
                             value={search}
                             onChange={handleSearch}
                             className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-44 text-sm bg-white"
@@ -454,7 +455,7 @@ export default function PlayerEditor() {
                                 "p-1.5 rounded transition-colors",
                                 viewMode === 'card' ? "bg-blue-100 text-blue-600" : "text-slate-400 hover:text-slate-600"
                             )}
-                            title="카드 뷰"
+                            title="카드 �?
                         >
                             <LayoutGrid size={16} />
                         </button>
@@ -464,7 +465,7 @@ export default function PlayerEditor() {
                                 "p-1.5 rounded transition-colors",
                                 viewMode === 'table' ? "bg-blue-100 text-blue-600" : "text-slate-400 hover:text-slate-600"
                             )}
-                            title="테이블 뷰"
+                            title="?�이�?�?
                         >
                             <LayoutList size={16} />
                         </button>
@@ -479,7 +480,7 @@ export default function PlayerEditor() {
                             className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm flex-1 sm:flex-initial justify-center"
                         >
                             <Plus size={16} />
-                            <span>새 선수</span>
+                            <span>???�수</span>
                         </button>
 
                         {Object.keys(modified).length > 0 && (
@@ -488,7 +489,7 @@ export default function PlayerEditor() {
                                 className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm"
                             >
                                 <Save size={16} />
-                                <span>저장 ({Object.keys(modified).length})</span>
+                                <span>?�??({Object.keys(modified).length})</span>
                             </button>
                         )}
                     </div>
@@ -527,15 +528,15 @@ export default function PlayerEditor() {
                                 {/* Stats Grid - 3x3 for 9 stats */}
                                 <div className="p-3 grid grid-cols-3 gap-1.5 text-center bg-slate-50">
                                     {[
-                                        { key: 'shooting', label: '슈팅', value: p.shooting },
+                                        { key: 'shooting', label: '?�팅', value: p.shooting },
                                         { key: 'offball_run', label: '침투', value: p.offball_run },
-                                        { key: 'ball_keeping', label: '키핑', value: p.ball_keeping },
-                                        { key: 'passing', label: '패스', value: p.passing },
+                                        { key: 'ball_keeping', label: '?�핑', value: p.ball_keeping },
+                                        { key: 'passing', label: '?�스', value: p.passing },
                                         { key: 'intercept', label: '차단', value: p.intercept },
                                         { key: 'marking', label: '마킹', value: p.marking },
                                         { key: 'stamina', label: '체력', value: p.stamina },
-                                        { key: 'speed', label: '속도', value: p.speed },
-                                        { key: 'physical', label: '피지컬', value: p.physical || 5 },
+                                        { key: 'speed', label: '?�도', value: p.speed },
+                                        { key: 'physical', label: '?��?�?, value: p.physical || 5 },
                                     ].map(stat => (
                                         <div key={stat.key} className="bg-white rounded-lg p-1.5 shadow-sm">
                                             <div className="text-[9px] text-slate-400 font-bold">{stat.label}</div>
@@ -564,12 +565,12 @@ export default function PlayerEditor() {
                                                         p.role === 'MATCH_RECORDER' && "bg-yellow-100 text-yellow-600",
                                                         (!p.role || p.role === 'member') && "bg-slate-100 text-slate-500"
                                                     )}>
-                                                        {p.role === 'ADMIN' ? '관리' : p.role === 'OWNER' ? '구단주' : p.role === 'MATCH_RECORDER' ? '기록' : '회원'}
+                                                        {p.role === 'ADMIN' ? '관�? : p.role === 'OWNER' ? '구단�? : p.role === 'MATCH_RECORDER' ? '기록' : '?�원'}
                                                     </span>
                                                 )}
                                             </div>
                                         ) : (
-                                            <span className="text-xs text-slate-400">미연결</span>
+                                            <span className="text-xs text-slate-400">미연�?/span>
                                         )}
                                     </div>
                                     {canEdit && (
@@ -580,14 +581,14 @@ export default function PlayerEditor() {
                                                     setIsNew(false);
                                                 }}
                                                 className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                                                title="수정"
+                                                title="?�정"
                                             >
                                                 <Edit2 size={16} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(p.id)}
                                                 className="p-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                                                title="삭제"
+                                                title="??��"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -609,20 +610,20 @@ export default function PlayerEditor() {
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
                                 <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">ID</th>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">이름</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?�름</th>
                                 <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">코드</th>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">역할</th>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">연결</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">슈팅</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">??��</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?�결</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?�팅</th>
                                 <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">침투</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">키핑</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">패스</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?�핑</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?�스</th>
                                 <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">차단</th>
                                 <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">마킹</th>
                                 <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">체력</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">속도</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">피지컬</th>
-                                {canEdit && <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">액션</th>}
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?�도</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?��?�?/th>
+                                {canEdit && <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">?�션</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -653,20 +654,20 @@ export default function PlayerEditor() {
                                                             ));
                                                         } else {
                                                             const err = await res.json();
-                                                            alert(err.error || '역할 변경 실패');
+                                                            alert(err.error || '??�� 변�??�패');
                                                         }
                                                     } catch (e) {
                                                         console.error(e);
-                                                        alert('역할 변경 중 오류 발생');
+                                                        alert('??�� 변�?�??�류 발생');
                                                     }
                                                 }}
                                                 className="border rounded px-2 py-1 text-xs"
                                             >
-                                                <option value="member">일반회원</option>
-                                                <option value="MATCH_RECORDER">기록원</option>
-                                                <option value="OWNER">구단주</option>
+                                                <option value="member">?�반?�원</option>
+                                                <option value="MATCH_RECORDER">기록??/option>
+                                                <option value="OWNER">구단�?/option>
                                                 <option value="ADMIN">관리자</option>
-                                                <option value="GUEST">게스트</option>
+                                                <option value="GUEST">게스??/option>
                                             </select>
                                         ) : p.user_id ? (
                                             <span className={cn(
@@ -676,7 +677,7 @@ export default function PlayerEditor() {
                                                 p.role === 'MATCH_RECORDER' && "bg-yellow-100 text-yellow-700",
                                                 (!p.role || p.role === 'member') && "bg-slate-100 text-slate-600"
                                             )}>
-                                                {p.role === 'ADMIN' ? '관리자' : p.role === 'OWNER' ? '구단주' : p.role === 'MATCH_RECORDER' ? '기록원' : '일반회원'}
+                                                {p.role === 'ADMIN' ? '관리자' : p.role === 'OWNER' ? '구단�? : p.role === 'MATCH_RECORDER' ? '기록?? : '?�반?�원'}
                                             </span>
                                         ) : (
                                             <span className="text-slate-400">-</span>
@@ -690,7 +691,7 @@ export default function PlayerEditor() {
                                                     <button
                                                         onClick={() => handleUnlinkUser(p.id)}
                                                         className="text-red-400 hover:text-red-600"
-                                                        title="연결 해제"
+                                                        title="?�결 ?�제"
                                                     >
                                                         <X size={14} />
                                                     </button>
@@ -709,7 +710,7 @@ export default function PlayerEditor() {
                                                     }}
                                                     className="border rounded px-2 py-1 text-xs w-28"
                                                 >
-                                                    <option value="">사용자 선택</option>
+                                                    <option value="">?�용???�택</option>
                                                     {users
                                                         .filter((u) => !linkedUserIds.has(u.id))
                                                         .map((u) => (
@@ -722,7 +723,7 @@ export default function PlayerEditor() {
                                                     onClick={async () => {
                                                         const userId = (p as any)._selectedUser;
                                                         if (!userId) {
-                                                            alert('사용자를 선택해주세요.');
+                                                            alert('?�용?��? ?�택?�주?�요.');
                                                             return;
                                                         }
                                                         const token = localStorage.getItem('auth_token');
@@ -736,20 +737,20 @@ export default function PlayerEditor() {
                                                                 body: JSON.stringify({ userId }),
                                                             });
                                                             if (res.ok) {
-                                                                alert('연결되었습니다.');
+                                                                alert('?�결?�었?�니??');
                                                                 fetchPlayers();
                                                             } else {
                                                                 const err = await res.json();
-                                                                alert(err.error || '연결에 실패했습니다.');
+                                                                alert(err.error || '?�결???�패?�습?�다.');
                                                             }
                                                         } catch (e) {
                                                             console.error(e);
                                                         }
                                                     }}
                                                     className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
-                                                    title="연결 확인"
+                                                    title="?�결 ?�인"
                                                 >
-                                                    연결
+                                                    ?�결
                                                 </button>
                                             </div>
                                         ) : (
@@ -757,7 +758,7 @@ export default function PlayerEditor() {
                                         )}
                                     </td>
 
-                                    {/* Stat columns – editable only if canEdit. But wait, `StatCell` uses `onChange`.
+                                    {/* Stat columns ??editable only if canEdit. But wait, `StatCell` uses `onChange`.
                     If !canEdit, we should probably disable input or render text.
                     I added `disabled` prop to StatCell.
                 */}
@@ -824,7 +825,7 @@ export default function PlayerEditor() {
                                                     setIsNew(false);
                                                 }}
                                                 className="text-blue-600 hover:text-blue-800"
-                                                title="수정"
+                                                title="?�정"
                                             >
                                                 <Edit2 size={18} />
                                             </button>
@@ -832,7 +833,7 @@ export default function PlayerEditor() {
                                                 <button
                                                     onClick={() => handleLinkUser(p.id)}
                                                     className="text-green-600 hover:text-green-800"
-                                                    title="사용자 연결"
+                                                    title="?�용???�결"
                                                     disabled={!selectedUser}
                                                 >
                                                     <Plus size={18} />
@@ -841,7 +842,7 @@ export default function PlayerEditor() {
                                             <button
                                                 onClick={() => handleDelete(p.id)}
                                                 className="text-red-600 hover:text-red-800"
-                                                title="삭제"
+                                                title="??��"
                                             >
                                                 <Trash2 size={18} />
                                             </button>
@@ -863,7 +864,7 @@ export default function PlayerEditor() {
                         {/* Modal Header */}
                         <div className="sticky top-0 bg-white border-b border-slate-100 p-4 flex items-center justify-between z-10">
                             <h2 className="text-lg font-bold text-slate-900">
-                                {isNew ? '새 선수 등록' : `${editing.name} 수정`}
+                                {isNew ? '???�수 ?�록' : `${editing.name} ?�정`}
                             </h2>
                             <button
                                 onClick={handleCancelEdit}
@@ -878,7 +879,7 @@ export default function PlayerEditor() {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                                        선수 이름
+                                        ?�수 ?�름
                                     </label>
                                     <input
                                         type="text"
@@ -887,13 +888,13 @@ export default function PlayerEditor() {
                                             setEditing({ ...editing, name: e.target.value })
                                         }
                                         className="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                                        placeholder="이름 입력"
+                                        placeholder="?�름 ?�력"
                                     />
                                 </div>
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                                        선수 코드
+                                        ?�수 코드
                                     </label>
                                     <input
                                         type="text"
@@ -901,30 +902,30 @@ export default function PlayerEditor() {
                                         onChange={(e) =>
                                             setEditing({ ...editing, player_code: e.target.value.toUpperCase() })
                                         }
-                                        placeholder="자동 생성"
+                                        placeholder="?�동 ?�성"
                                         className="w-full border border-slate-200 rounded-xl px-4 py-3 font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                                         maxLength={6}
                                     />
-                                    <p className="text-xs text-slate-400 mt-1">비워두면 자동 생성됩니다</p>
+                                    <p className="text-xs text-slate-400 mt-1">비워?�면 ?�동 ?�성?�니??/p>
                                 </div>
                             </div>
 
                             {/* Stats Section */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                                    능력치 (1-10)
+                                    ?�력�?(1-10)
                                 </label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {[
-                                        { key: 'shooting' as keyof Player, label: '슈팅', color: 'bg-red-50 border-red-100' },
+                                        { key: 'shooting' as keyof Player, label: '?�팅', color: 'bg-red-50 border-red-100' },
                                         { key: 'offball_run' as keyof Player, label: '침투', color: 'bg-orange-50 border-orange-100' },
-                                        { key: 'ball_keeping' as keyof Player, label: '키핑', color: 'bg-yellow-50 border-yellow-100' },
-                                        { key: 'passing' as keyof Player, label: '패스', color: 'bg-green-50 border-green-100' },
+                                        { key: 'ball_keeping' as keyof Player, label: '?�핑', color: 'bg-yellow-50 border-yellow-100' },
+                                        { key: 'passing' as keyof Player, label: '?�스', color: 'bg-green-50 border-green-100' },
                                         { key: 'intercept' as keyof Player, label: '차단', color: 'bg-teal-50 border-teal-100' },
                                         { key: 'marking' as keyof Player, label: '마킹', color: 'bg-blue-50 border-blue-100' },
                                         { key: 'stamina' as keyof Player, label: '체력', color: 'bg-indigo-50 border-indigo-100' },
-                                        { key: 'speed' as keyof Player, label: '속도', color: 'bg-purple-50 border-purple-100' },
-                                        { key: 'physical' as keyof Player, label: '피지컬', color: 'bg-pink-50 border-pink-100' },
+                                        { key: 'speed' as keyof Player, label: '?�도', color: 'bg-purple-50 border-purple-100' },
+                                        { key: 'physical' as keyof Player, label: '?��?�?, color: 'bg-pink-50 border-pink-100' },
                                     ].map((stat) => (
                                         <div key={stat.key} className={`p-3 rounded-xl border ${stat.color}`}>
                                             <div className="flex items-center justify-between mb-2">
@@ -974,7 +975,7 @@ export default function PlayerEditor() {
                                 className="flex-1 px-4 py-3 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-500/30 hover:bg-blue-500 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                             >
                                 <Save size={18} />
-                                저장하기
+                                ?�?�하�?
                             </button>
                         </div>
                     </div>
@@ -983,3 +984,5 @@ export default function PlayerEditor() {
         </div>
     );
 }
+
+

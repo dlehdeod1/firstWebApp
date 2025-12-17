@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom'
 import { Calendar, Users, MapPin, ChevronRight, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const API_URL = 'http://localhost:8787'
-
 function getSeasonTitle(dateStr: string) {
     const date = new Date(dateStr)
     const year = date.getFullYear()
@@ -17,10 +15,10 @@ function getSeasonTitle(dateStr: string) {
 
     // Calculate difference in weeks
     const msDiff = date.getTime() - firstWed.getTime()
-    if (msDiff < 0) return `${year} 프리시즌` // Before first Wed
+    if (msDiff < 0) return `${year} ?�리?�즌` // Before first Wed
 
     const weekNum = Math.floor(msDiff / (7 * 24 * 60 * 60 * 1000)) + 1
-    return `${year}시즌 ${weekNum}경기`
+    return `${year}?�즌 ${weekNum}경기`
 }
 
 function SessionCard({ session }: { session: any }) {
@@ -36,7 +34,7 @@ function SessionCard({ session }: { session: any }) {
                     isRecruiting ? "bg-blue-50 text-blue-600" :
                         isClosed ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-600"
                 )}>
-                    {session.status === 'recruiting' ? '모집중' : session.status === 'closed' ? '마감' : '종료'}
+                    {session.status === 'recruiting' ? '모집�? : session.status === 'closed' ? '마감' : '종료'}
                 </div>
                 {isRecruiting && (
                     <span className="flex h-3 w-3 relative">
@@ -53,18 +51,18 @@ function SessionCard({ session }: { session: any }) {
             <div className="space-y-2 text-sm text-slate-500 mb-6">
                 <div className="flex items-center gap-2">
                     <Calendar size={14} />
-                    <span>{session.session_date} (수) 20:00</span>
+                    <span>{session.session_date} (?? 20:00</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <MapPin size={14} />
-                    <span>경북대 풋살장 A구장</span>
+                    <span>경북?� ?�살??A구장</span>
                 </div>
             </div>
 
             <div className="flex items-center justify-between border-t border-slate-50 pt-4">
                 <div className="flex items-center gap-2 text-slate-600">
                     <Users size={16} />
-                    <span className="font-semibold">{session.attendance_count || 0}명</span>
+                    <span className="font-semibold">{session.attendance_count || 0}�?/span>
                     <span className="text-slate-400 font-normal">참석</span>
                 </div>
                 <span className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
@@ -96,20 +94,20 @@ export default function SessionList() {
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
-                        일정 목록
+                        ?�정 목록
                     </h1>
-                    <p className="text-slate-500 mt-1">참석 가능한 일정을 확인하세요.</p>
+                    <p className="text-slate-500 mt-1">참석 가?�한 ?�정???�인?�세??</p>
                 </div>
                 {isAdmin && (
                     <Link to="/sessions/new" className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg shadow-blue-200">
                         <Plus size={18} />
-                        일정 생성
+                        ?�정 ?�성
                     </Link>
                 )}
             </div>
             {
                 loading ? (
-                    <div className="text-center py-20 text-slate-400">일정을 불러오는 중...</div>
+                    <div className="text-center py-20 text-slate-400">?�정??불러?�는 �?..</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {sessions.map(session => (
@@ -117,7 +115,7 @@ export default function SessionList() {
                         ))}
                         {sessions.length === 0 && (
                             <div className="col-span-full text-center py-20 text-slate-400">
-                                등록된 일정이 없습니다.
+                                ?�록???�정???�습?�다.
                             </div>
                         )}
                     </div>
@@ -126,3 +124,5 @@ export default function SessionList() {
         </div >
     )
 }
+
+

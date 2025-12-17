@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Play, Pause, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const API_URL = 'http://localhost:8787'
-
 interface Player {
     id: number
     name: string
@@ -146,7 +144,7 @@ export default function MatchRecordPage() {
                         }
                     })
                 }
-                alert('기록 실패')
+                alert('기록 ?�패')
             }
         } catch (e) {
             console.error(e)
@@ -161,12 +159,12 @@ export default function MatchRecordPage() {
                     }
                 })
             }
-            alert('기록 실패')
+            alert('기록 ?�패')
         }
     }
 
     const deleteEvent = async (log: EventLog) => {
-        if (!confirm(`${log.playerName}의 ${log.type === 'GOAL' ? '골' : '호수비'} 기록을 삭제하시겠습니까?`)) return
+        if (!confirm(`${log.playerName}??${log.type === 'GOAL' ? '�? : '?�수�?} 기록????��?�시겠습?�까?`)) return
 
         // Remove from local logs
         setEventLogs(prev => prev.filter(e => e.id !== log.id))
@@ -211,12 +209,12 @@ export default function MatchRecordPage() {
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="text-slate-400">로딩 중...</div>
+            <div className="text-slate-400">로딩 �?..</div>
         </div>
     )
     if (!match) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="text-slate-400">경기를 찾을 수 없습니다.</div>
+            <div className="text-slate-400">경기�?찾을 ???�습?�다.</div>
         </div>
     )
 
@@ -281,19 +279,19 @@ export default function MatchRecordPage() {
                         actionMode === 'assist' && "bg-amber-500 text-white",
                         actionMode === 'defense' && "bg-violet-500 text-white"
                     )}>
-                        {actionMode === 'goal' && "⚽ 득점자를 선택하세요"}
+                        {actionMode === 'goal' && "???�점?��? ?�택?�세??}
                         {actionMode === 'assist' && (
                             <div className="flex items-center justify-center gap-2 flex-wrap">
-                                <span>🅰️ {pendingGoal?.scorerName} 골 → 어시스트?</span>
+                                <span>?���?{pendingGoal?.scorerName} �????�시?�트?</span>
                                 <button
                                     onClick={handleGoalWithoutAssist}
                                     className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-xs"
                                 >
-                                    없음
+                                    ?�음
                                 </button>
                             </div>
                         )}
-                        {actionMode === 'defense' && "🛡️ 호수비 선수를 선택하세요"}
+                        {actionMode === 'defense' && "?���??�수�??�수�??�택?�세??}
                     </div>
                 )}
 
@@ -356,7 +354,7 @@ export default function MatchRecordPage() {
                 {eventLogs.length > 0 && (
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-                            📋 기록 로그
+                            ?�� 기록 로그
                         </h3>
                         <div className="space-y-2 max-h-48 overflow-y-auto">
                             {eventLogs.map(log => (
@@ -364,9 +362,9 @@ export default function MatchRecordPage() {
                                     <div className="flex items-center gap-2">
                                         <span className="text-slate-400 font-mono text-xs">{formatTime(log.time)}</span>
                                         <span className="font-medium text-slate-800">{log.playerName}</span>
-                                        <span>{log.type === 'GOAL' ? '⚽' : '🛡️'}</span>
+                                        <span>{log.type === 'GOAL' ? '?? : '?���?}</span>
                                         {log.assisterName && (
-                                            <span className="text-slate-500 text-xs">← {log.assisterName}</span>
+                                            <span className="text-slate-500 text-xs">??{log.assisterName}</span>
                                         )}
                                     </div>
                                     <button
@@ -397,7 +395,7 @@ export default function MatchRecordPage() {
                                 : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
                         )}
                     >
-                        <span className="text-lg">⚽</span> 골 기록
+                        <span className="text-lg">??/span> �?기록
                     </button>
                     <button
                         onClick={() => {
@@ -411,10 +409,12 @@ export default function MatchRecordPage() {
                                 : "bg-violet-100 text-violet-700 hover:bg-violet-200"
                         )}
                     >
-                        <span className="text-lg">🛡️</span> 호수비
+                        <span className="text-lg">?���?/span> ?�수�?
                     </button>
                 </div>
             </div>
         </div>
     )
 }
+
+

@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { Trophy, Medal, Flame } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const API_URL = 'http://localhost:8787'
-
 interface RankItem {
     id: number
     rank: number
@@ -48,11 +46,11 @@ export default function RankingsPage() {
     }
 
     const tabs = [
-        { id: 'points' as const, label: 'P', fullLabel: 'ê³µê²©í¬ì¸íŠ¸', icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50', activeBg: 'bg-orange-500' },
-        { id: 'goals' as const, label: 'G', fullLabel: 'ë“ì ', icon: Trophy, color: 'text-yellow-500', bg: 'bg-yellow-50', activeBg: 'bg-yellow-500' },
-        { id: 'assists' as const, label: 'A', fullLabel: 'ë„ì›€', icon: Medal, color: 'text-blue-500', bg: 'bg-blue-50', activeBg: 'bg-blue-500' },
-        { id: 'ppm' as const, label: 'PPM', fullLabel: 'ê²½ê¸°ë‹¹P', icon: Flame, color: 'text-purple-500', bg: 'bg-purple-50', activeBg: 'bg-purple-500' },
-        { id: 'winRate' as const, label: '%', fullLabel: 'ìŠ¹ë¥ ', icon: Trophy, color: 'text-green-500', bg: 'bg-green-50', activeBg: 'bg-green-500' },
+        { id: 'points' as const, label: 'P', fullLabel: 'ê³µê²©?¬ì¸??, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50', activeBg: 'bg-orange-500' },
+        { id: 'goals' as const, label: 'G', fullLabel: '?ì ', icon: Trophy, color: 'text-yellow-500', bg: 'bg-yellow-50', activeBg: 'bg-yellow-500' },
+        { id: 'assists' as const, label: 'A', fullLabel: '?„ì?', icon: Medal, color: 'text-blue-500', bg: 'bg-blue-50', activeBg: 'bg-blue-500' },
+        { id: 'ppm' as const, label: 'PPM', fullLabel: 'ê²½ê¸°?¹P', icon: Flame, color: 'text-purple-500', bg: 'bg-purple-50', activeBg: 'bg-purple-500' },
+        { id: 'winRate' as const, label: '%', fullLabel: '?¹ë¥ ', icon: Trophy, color: 'text-green-500', bg: 'bg-green-50', activeBg: 'bg-green-500' },
     ]
 
     const activeTab = tabs.find(t => t.id === tab)!
@@ -70,7 +68,7 @@ export default function RankingsPage() {
     return (
         <div className="max-w-2xl mx-auto p-4 pb-24">
             <h1 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2">
-                <Trophy className="text-yellow-500" size={24} /> ì‹œì¦Œ ë­í‚¹
+                <Trophy className="text-yellow-500" size={24} /> ?œì¦Œ ??‚¹
             </h1>
 
             {/* Tab Pills */}
@@ -95,14 +93,14 @@ export default function RankingsPage() {
             {/* Tab Label */}
             <div className="flex items-center gap-2 mb-3">
                 <div className={cn("px-2 py-0.5 rounded-full text-xs font-bold", activeTab.bg, activeTab.color)}>
-                    {activeTab.fullLabel} ìˆœìœ„
+                    {activeTab.fullLabel} ?œìœ„
                 </div>
             </div>
 
             {/* Content */}
             {loading ? (
                 <div className="py-20 text-center text-slate-400 animate-pulse">
-                    ë­í‚¹ ì§‘ê³„ ì¤‘...
+                    ??‚¹ ì§‘ê³„ ì¤?..
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -132,13 +130,13 @@ export default function RankingsPage() {
                             <div className="flex-1 min-w-0">
                                 <div className="font-bold text-slate-900 truncate">
                                     {item.name}
-                                    {i === 0 && <span className="ml-1">ğŸ‘‘</span>}
+                                    {i === 0 && <span className="ml-1">?‘‘</span>}
                                 </div>
                                 <div className="text-[10px] text-slate-400 flex gap-2">
                                     <span>{item.games}ê²½ê¸°</span>
-                                    <span className="text-yellow-500">ğŸ¥‡{item.rank1}</span>
-                                    <span className="text-slate-400">ğŸ¥ˆ{item.rank2}</span>
-                                    <span className="text-orange-500">ğŸ¥‰{item.rank3}</span>
+                                    <span className="text-yellow-500">?¥‡{item.rank1}</span>
+                                    <span className="text-slate-400">?¥ˆ{item.rank2}</span>
+                                    <span className="text-orange-500">?¥‰{item.rank3}</span>
                                 </div>
                             </div>
 
@@ -153,16 +151,18 @@ export default function RankingsPage() {
 
                             {/* Secondary Stats */}
                             <div className="hidden sm:flex flex-col gap-0.5 text-right shrink-0 border-l pl-3 border-slate-100">
-                                <div className="text-xs text-slate-500">{item.goals}ê³¨ {item.assists}ë„ì›€</div>
-                                <div className="text-xs text-slate-400">ìŠ¹ë¥  {item.winRate}%</div>
+                                <div className="text-xs text-slate-500">{item.goals}ê³?{item.assists}?„ì?</div>
+                                <div className="text-xs text-slate-400">?¹ë¥  {item.winRate}%</div>
                             </div>
                         </div>
                     ))}
                     {data.length === 0 && (
-                        <div className="py-10 text-center text-slate-400">ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤.</div>
+                        <div className="py-10 text-center text-slate-400">?°ì´?°ê? ?†ìŠµ?ˆë‹¤.</div>
                     )}
                 </div>
             )}
         </div>
     )
 }
+
+

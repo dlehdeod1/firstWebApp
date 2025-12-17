@@ -35,25 +35,25 @@ export default function SignupPage() {
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!agreed) return alert('개인정보 수집 및 이용에 동의해주세요.')
-        if (!username || !password) return alert('아이디와 비밀번호를 입력해주세요.')
-        if (!birthDate) return alert('생년월일을 입력해주세요.')
+        if (!agreed) return alert('개인?�보 ?�집 �??�용???�의?�주?�요.')
+        if (!username || !password) return alert('?�이?��? 비�?번호�??�력?�주?�요.')
+        if (!birthDate) return alert('?�년?�일???�력?�주?�요.')
 
         // Phone Validation (if provided)
         if (phone) {
             const cleanPhone = phone.replace(/-/g, '')
             if (cleanPhone.length < 10 || cleanPhone.length > 11) {
-                return alert('올바른 휴대폰 번호를 입력해주세요.')
+                return alert('?�바�??��???번호�??�력?�주?�요.')
             }
         }
 
         // Username Validation (Simple)
         if (!/^[a-zA-Z0-9_]{4,20}$/.test(username)) {
-            return alert('아이디는 영문, 숫자, 밑줄(_) 4~20자여야 합니다.')
+            return alert('?�이?�는 ?�문, ?�자, 밑줄(_) 4~20?�여???�니??')
         }
 
         try {
-            const res = await fetch('http://localhost:8787/auth/signup', {
+            const res = await fetch('${API_URL}/auth/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -73,15 +73,15 @@ export default function SignupPage() {
                 localStorage.setItem('auth_token', data.token)
                 localStorage.setItem('user_username', data.user.username)
                 localStorage.setItem('user_role', data.user.role)
-                alert('회원가입이 완료되었습니다.')
+                alert('?�원가?�이 ?�료?�었?�니??')
                 navigate('/me')
                 window.location.reload()
             } else {
-                alert(data.error || '회원가입 실패')
+                alert(data.error || '?�원가???�패')
             }
         } catch (err) {
             console.error(err)
-            alert('오류 발생')
+            alert('?�류 발생')
         }
     }
 
@@ -92,14 +92,14 @@ export default function SignupPage() {
                     <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white shadow-lg shadow-blue-500/30">
                         <UserPlus size={32} />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">회원가입</h1>
-                    <p className="text-slate-500 mt-2">Wednesday FC 멤버가 되어보세요.</p>
+                    <h1 className="text-2xl font-bold text-slate-900">?�원가??/h1>
+                    <p className="text-slate-500 mt-2">Wednesday FC 멤버가 ?�어보세??</p>
                 </div>
 
                 <form onSubmit={handleSignup} className="space-y-4">
                     {/* Auth Info */}
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">아이디 (ID)</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">?�이??(ID)</label>
                         <input
                             type="text"
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
@@ -110,18 +110,18 @@ export default function SignupPage() {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">비밀번호</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">비�?번호</label>
                         <input
                             type="password"
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="••••••••"
+                            placeholder="?�••••••�?
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">이메일 <span className="text-slate-400 font-normal">(선택)</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">?�메??<span className="text-slate-400 font-normal">(?�택)</span></label>
                         <input
                             type="email"
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
@@ -134,10 +134,10 @@ export default function SignupPage() {
                     <div className="h-px bg-slate-100 my-4" />
 
                     {/* Profile Info */}
-                    <p className="text-xs text-slate-400 font-bold uppercase mb-2">프로필 정보</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase mb-2">?�로???�보</p>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">연락처 <span className="text-slate-400 font-normal">(선택)</span></label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">?�락�?<span className="text-slate-400 font-normal">(?�택)</span></label>
                         <input
                             type="tel"
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
@@ -151,7 +151,7 @@ export default function SignupPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">생년월일</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">?�년?�일</label>
                         <div className="flex gap-2">
                             <input
                                 type="date"
@@ -161,14 +161,14 @@ export default function SignupPage() {
                                 required
                             />
                             <div className="min-w-[80px] flex items-center justify-center bg-slate-100 rounded-xl text-sm font-bold text-slate-600">
-                                {age !== null ? `${age}세` : '-'}
+                                {age !== null ? `${age}?? : '-'}
                             </div>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">키 (cm)</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">??(cm)</label>
                             <input
                                 type="number"
                                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
@@ -178,7 +178,7 @@ export default function SignupPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">몸무게 (kg)</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">몸무�?(kg)</label>
                             <input
                                 type="number"
                                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
@@ -191,7 +191,7 @@ export default function SignupPage() {
 
                     <div className="bg-blue-50 p-4 rounded-xl">
                         <p className="text-xs text-blue-800 mb-2 font-medium">
-                            * 키, 몸무게, 나이는 피지컬 수치 객관화를 위한 참고 정보입니다.
+                            * ?? 몸무�? ?�이???��?�??�치 객�??��? ?�한 참고 ?�보?�니??
                         </p>
                         <label className="flex items-start gap-2 cursor-pointer">
                             <input
@@ -201,7 +201,7 @@ export default function SignupPage() {
                                 onChange={e => setAgreed(e.target.checked)}
                             />
                             <span className="text-sm text-slate-700">
-                                <span className="font-bold text-red-500">(필수)</span> 프로필 정보 및 연락처(선택 입력) 수집/이용에 동의합니다.
+                                <span className="font-bold text-red-500">(?�수)</span> ?�로???�보 �??�락�??�택 ?�력) ?�집/?�용???�의?�니??
                             </span>
                         </label>
                     </div>
@@ -211,14 +211,16 @@ export default function SignupPage() {
                         disabled={!agreed}
                         className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        가입완료
+                        가?�완�?
                     </button>
                 </form>
 
                 <div className="mt-6 text-center text-sm font-medium text-slate-500">
-                    이미 계정이 있으신가요? <Link to="/login" className="text-blue-600 hover:underline">로그인</Link>
+                    ?��? 계정???�으?��??? <Link to="/login" className="text-blue-600 hover:underline">로그??/Link>
                 </div>
             </div>
         </div>
     )
 }
+
+

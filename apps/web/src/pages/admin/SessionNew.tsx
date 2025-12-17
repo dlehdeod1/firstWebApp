@@ -1,7 +1,11 @@
 import { useState } from 'react';
+import { API_URL } from "@/lib/api";\r
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from "@/lib/api";\r
 import { Save, RefreshCw, Wand2, AlertCircle } from 'lucide-react';
+import { API_URL } from "@/lib/api";\r
 import { cn } from '@/lib/utils';
+import { API_URL } from "@/lib/api";\r
 
 interface ParsedResult {
     date: string;
@@ -19,7 +23,7 @@ export default function SessionNew() {
     const handleParse = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:8787/sessions/parse', { // Local dev URL
+            const res = await fetch('${API_URL}/sessions/parse', { // Local dev URL
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text })
@@ -34,11 +38,11 @@ export default function SessionNew() {
     };
 
     const handleRegister = async (name: string) => {
-        if (!confirm(`'${name}' 선수를 새로 등록하시겠습니까?`)) return;
+        if (!confirm(`'${name}' ?�수�??�로 ?�록?�시겠습?�까?`)) return;
 
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:8787/players', {
+            const res = await fetch('${API_URL}/players', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -62,7 +66,7 @@ export default function SessionNew() {
                     });
                 }
             } else {
-                alert('등록 실패: ' + (data.error || 'Unknown error'));
+                alert('?�록 ?�패: ' + (data.error || 'Unknown error'));
             }
         } catch (e) {
             alert('Error: ' + e);
@@ -71,16 +75,16 @@ export default function SessionNew() {
 
     const handleSave = async () => {
         if (!result) return;
-        if (!confirm(`${result.date} 일정을 생성하시겠습니까?\n참석자: ${result.matched.length}명`)) return;
+        if (!confirm(`${result.date} ?�정???�성?�시겠습?�까?\n참석?? ${result.matched.length}�?)) return;
 
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:8787/sessions', {
+            const res = await fetch('${API_URL}/sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     date: result.date,
-                    title: '정기 운동',
+                    title: '?�기 ?�동',
                     pot_total: 0,
                     base_fee: 0,
                     player_ids: result.matched.map(p => p.id)
@@ -90,11 +94,11 @@ export default function SessionNew() {
             if (data.success) {
                 navigate(`/sessions/${data.id}`);
             } else {
-                alert('세션 생성 실패');
+                alert('?�션 ?�성 ?�패');
             }
         } catch (e) {
             console.error(e);
-            alert('오류가 발생했습니다: ' + e);
+            alert('?�류가 발생?�습?�다: ' + e);
         } finally {
             setLoading(false);
         }
@@ -103,8 +107,8 @@ export default function SessionNew() {
     return (
         <div className="max-w-5xl mx-auto space-y-8">
             <div className="text-center md:text-left">
-                <h1 className="text-3xl font-extrabold text-slate-900 mb-2">새 일정 생성</h1>
-                <p className="text-slate-500">카카오톡 투표 결과를 붙여넣어 참석자를 자동으로 정리하세요.</p>
+                <h1 className="text-3xl font-extrabold text-slate-900 mb-2">???�정 ?�성</h1>
+                <p className="text-slate-500">카카?�톡 ?�표 결과�?붙여?�어 참석?��? ?�동?�로 ?�리?�세??</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -113,7 +117,7 @@ export default function SessionNew() {
                     <div className="flex items-center justify-between">
                         <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
                             <Wand2 size={16} className="text-purple-600" />
-                            카카오톡 투표 붙여넣기
+                            카카?�톡 ?�표 붙여?�기
                         </label>
                         <button
                             onClick={handleParse}
@@ -124,19 +128,19 @@ export default function SessionNew() {
                             )}
                         >
                             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                            {loading ? '분석 중...' : '매직 파싱 실행'}
+                            {loading ? '분석 �?..' : '매직 ?�싱 ?�행'}
                         </button>
                     </div>
 
                     <div className="relative group">
                         <textarea
                             className="w-full h-[400px] p-4 bg-white border border-slate-200 rounded-2xl font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm group-hover:shadow-md"
-                            placeholder={"[투표] 12/17 정기운동\n\n1. 손흥민\n2. 이강인\n3. 김민재\n..."}
+                            placeholder={"[?�표] 12/17 ?�기?�동\n\n1. ?�흥�?n2. ?�강??n3. 김민재\n..."}
                             value={text}
                             onChange={e => setText(e.target.value)}
                         />
                         <div className="absolute bottom-4 right-4 text-xs text-slate-400 font-medium bg-slate-100/80 px-2 py-1 rounded">
-                            {text.length}자
+                            {text.length}??
                         </div>
                     </div>
                 </div>
@@ -153,22 +157,22 @@ export default function SessionNew() {
                                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2">
                                     <Wand2 className="text-slate-400" size={32} />
                                 </div>
-                                <p className="text-slate-900 font-bold">아직 데이터가 없습니다.</p>
-                                <p className="text-sm text-slate-500">좌측에 텍스트를 입력하고 파싱 버튼을 눌러주세요.</p>
+                                <p className="text-slate-900 font-bold">?�직 ?�이?��? ?�습?�다.</p>
+                                <p className="text-sm text-slate-500">좌측???�스?��? ?�력?�고 ?�싱 버튼???�러주세??</p>
                             </div>
                         ) : (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 {/* Date Section */}
                                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wider block mb-1">날짜 감지됨</span>
-                                    <p className="text-lg font-bold text-blue-900">{result.date || '날짜 없음'}</p>
+                                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wider block mb-1">?�짜 감�???/span>
+                                    <p className="text-lg font-bold text-blue-900">{result.date || '?�짜 ?�음'}</p>
                                 </div>
 
                                 {/* Players Section */}
                                 <div>
                                     <div className="flex justify-between items-end mb-3">
-                                        <span className="text-sm font-bold text-slate-700">참석자 명단</span>
-                                        <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{result.count}명</span>
+                                        <span className="text-sm font-bold text-slate-700">참석??명단</span>
+                                        <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{result.count}�?/span>
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
@@ -182,7 +186,7 @@ export default function SessionNew() {
                                                 key={i}
                                                 onClick={() => handleRegister(name)}
                                                 className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-100 rounded-lg text-sm font-bold flex items-center gap-1 animate-pulse hover:bg-red-100 transition-colors"
-                                                title="클릭하여 선수 등록"
+                                                title="?�릭?�여 ?�수 ?�록"
                                             >
                                                 <AlertCircle size={12} />
                                                 {name}?
@@ -197,7 +201,7 @@ export default function SessionNew() {
                                         className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
                                     >
                                         <Save size={20} />
-                                        세션 저장 및 팀 생성 준비
+                                        ?�션 ?�??�??� ?�성 준�?
                                     </button>
                                 </div>
                             </div>
@@ -208,3 +212,5 @@ export default function SessionNew() {
         </div>
     );
 }
+
+

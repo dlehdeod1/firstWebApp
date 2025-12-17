@@ -20,10 +20,10 @@ interface AbilityLog {
 }
 
 const TOOLTIPS: Record<string, string> = {
-    '득점력': '((득점x2 + 도움) / 경기수) * 20 (최대 100점)',
-    '기여도': '팀 승리와 공격포인트를 종합하여 산출된 기여도',
-    '승률': '승리 경기 수 / 전체 경기 수 (백분율)',
-    '참여도': '시즌 경기 참석 횟수 기반 (상대평가)'
+    '?�점??: '((?�점x2 + ?��?) / 경기?? * 20 (최�? 100??',
+    '기여??: '?� ?�리?� 공격?�인?��? 종합?�여 ?�출??기여??,
+    '?�률': '?�리 경기 ??/ ?�체 경기 ??(백분??',
+    '참여??: '?�즌 경기 참석 ?�수 기반 (?��??��?)'
 }
 
 interface UserProfile {
@@ -77,12 +77,12 @@ function PreferenceSection() {
         if (!token) return
 
         // Fetch All Players
-        fetch('http://localhost:8787/players', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch('${API_URL}/players', { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.json())
             .then(data => setPlayers(Array.isArray(data) ? data : []))
 
         // Fetch My Preferences
-        fetch('http://localhost:8787/me/preferences', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch('${API_URL}/me/preferences', { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.json())
             .then(data => {
                 if (data.preferences) setPreferences(data.preferences)
@@ -102,15 +102,15 @@ function PreferenceSection() {
         const token = localStorage.getItem('auth_token')
         setSaving(true)
         try {
-            const res = await fetch('http://localhost:8787/me/preferences', {
+            const res = await fetch('${API_URL}/me/preferences', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ preferences })
             })
-            if (res.ok) alert('선호 멤버가 저장되었습니다.')
-            else alert('저장 실패')
+            if (res.ok) alert('?�호 멤버가 ?�?�되?�습?�다.')
+            else alert('?�???�패')
         } catch (e) {
-            alert('오류 발생')
+            alert('?�류 발생')
         } finally {
             setSaving(false)
         }
@@ -122,10 +122,10 @@ function PreferenceSection() {
         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
             <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <Heart size={18} className="text-pink-500" />
-                선호 멤버 설정 (Chemistry)
+                ?�호 멤버 ?�정 (Chemistry)
             </h2>
             <p className="text-xs text-slate-500">
-                함께 뛰고 싶은 멤버를 선택하세요. 팀 구성 시 같은 팀이 될 확률이 높아집니다. (1지망일수록 강력하게 반영)
+                ?�께 ?�고 ?��? 멤버�??�택?�세?? ?� 구성 ??같�? ?�?????�률???�아집니?? (1지망일?�록 강력?�게 반영)
             </p>
 
             <div className="space-y-3">
@@ -141,7 +141,7 @@ function PreferenceSection() {
                                 value={current?.targetId || -1}
                                 onChange={(e) => handleSelect(rank, Number(e.target.value))}
                             >
-                                <option value={-1}>선택 안함</option>
+                                <option value={-1}>?�택 ?�함</option>
                                 {players.map(p => (
                                     <option key={p.id} value={p.id}>{p.name} ({p.player_code})</option>
                                 ))}
@@ -156,7 +156,7 @@ function PreferenceSection() {
                 disabled={saving}
                 className="w-full py-3 mt-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 disabled:opacity-50"
             >
-                {saving ? '저장 중...' : '선호도 저장'}
+                {saving ? '?�??�?..' : '?�호???�??}
             </button>
         </div>
     )
@@ -184,7 +184,7 @@ export default function MePage() {
             return
         }
 
-        fetch('http://localhost:8787/me', {
+        fetch('${API_URL}/me', {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => {
@@ -222,14 +222,14 @@ export default function MePage() {
         const h = Number(form.height_cm)
         const w = Number(form.weight_kg)
 
-        if (h && (h < 120 || h > 220)) return alert('키는 120~220cm 사이에여야 합니다.')
-        if (w && (w < 30 || w > 150)) return alert('몸무게는 30~150kg 사이여야 합니다.')
-        if (form.phone && !/^[0-9-]{10,13}$/.test(form.phone)) return alert('올바른 휴대폰 번호를 입력해주세요.')
+        if (h && (h < 120 || h > 220)) return alert('?�는 120~220cm ?�이?�여???�니??')
+        if (w && (w < 30 || w > 150)) return alert('몸무게는 30~150kg ?�이?�야 ?�니??')
+        if (form.phone && !/^[0-9-]{10,13}$/.test(form.phone)) return alert('?�바�??��???번호�??�력?�주?�요.')
 
         setSaving(true)
         try {
             const token = localStorage.getItem('auth_token')
-            const res = await fetch('http://localhost:8787/me', {
+            const res = await fetch('${API_URL}/me', {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -239,39 +239,39 @@ export default function MePage() {
             })
 
             if (res.ok) {
-                alert('저장되었습니다.')
+                alert('?�?�되?�습?�다.')
                 window.location.reload()
             } else {
                 const err = await res.json()
-                alert(err.error || '저장 실패')
+                alert(err.error || '?�???�패')
             }
         } catch (e) {
-            alert('오류 발생')
+            alert('?�류 발생')
         } finally {
             setSaving(false)
         }
     }
 
     const handleLogout = () => {
-        if (!confirm('로그아웃 하시겠습니까?')) return
+        if (!confirm('로그?�웃 ?�시겠습?�까?')) return
         localStorage.clear()
         navigate('/login')
     }
 
-    if (loading) return <div className="p-8 text-center text-slate-500">로딩 중...</div>
+    if (loading) return <div className="p-8 text-center text-slate-500">로딩 �?..</div>
 
     // Chart Data
     const chartData = data?.abilities ? [
-        { subject: '득점력', A: data.abilities.curr_attack, fullMark: 100 },
-        { subject: '기여도', A: data.abilities.curr_playmaker, fullMark: 100 },
-        { subject: '승률', A: data.abilities.curr_competitiveness, fullMark: 100 },
-        { subject: '참여도', A: data.abilities.curr_diligence, fullMark: 100 },
+        { subject: '?�점??, A: data.abilities.curr_attack, fullMark: 100 },
+        { subject: '기여??, A: data.abilities.curr_playmaker, fullMark: 100 },
+        { subject: '?�률', A: data.abilities.curr_competitiveness, fullMark: 100 },
+        { subject: '참여??, A: data.abilities.curr_diligence, fullMark: 100 },
     ] : []
 
     return (
         <div className="max-w-md mx-auto pb-20 p-4">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-6">
-                마이 페이지
+                마이 ?�이지
             </h1>
 
             <div className="space-y-6">
@@ -285,11 +285,11 @@ export default function MePage() {
                         <div className="text-sm text-slate-500">@{data?.user.username}</div>
                         <div className="flex gap-2 mt-1">
                             <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-bold">
-                                {['owner', 'OWNER'].includes(data?.user.role || '') ? '구단주' : (['admin', 'ADMIN'].includes(data?.user.role || '') ? '운영진' : '멤버')}
+                                {['owner', 'OWNER'].includes(data?.user.role || '') ? '구단�? : (['admin', 'ADMIN'].includes(data?.user.role || '') ? '?�영�? : '멤버')}
                             </span>
                             {data?.profile?.age && (
                                 <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
-                                    {data.profile.age}세
+                                    {data.profile.age}??
                                 </span>
                             )}
                         </div>
@@ -304,10 +304,10 @@ export default function MePage() {
                             <div className="bg-slate-800 text-white rounded-2xl p-6 border border-slate-700 shadow-sm">
                                 <h2 className="font-bold text-lg mb-2 flex items-center gap-2">
                                     <Users size={20} className="text-yellow-400" />
-                                    선수 연결하기
+                                    ?�수 ?�결?�기
                                 </h2>
                                 <p className="text-sm text-slate-300 mb-4">
-                                    구단에서 발급받은 <strong>선수 코드(6자리)</strong>를 입력하여 계정을 연결하세요.
+                                    구단?�서 발급받�? <strong>?�수 코드(6?�리)</strong>�??�력?�여 계정???�결?�세??
                                 </p>
                                 <div className="flex gap-2">
                                     <input
@@ -320,27 +320,27 @@ export default function MePage() {
                                         onClick={async () => {
                                             const input = document.getElementById('playerCodeInput') as HTMLInputElement
                                             const code = input.value.toUpperCase()
-                                            if (code.length < 6) return alert('코드를 확인해주세요.')
+                                            if (code.length < 6) return alert('코드�??�인?�주?�요.')
 
                                             try {
                                                 const token = localStorage.getItem('auth_token')
-                                                const res = await fetch('http://localhost:8787/me/claim-player', {
+                                                const res = await fetch('${API_URL}/me/claim-player', {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                                                     body: JSON.stringify({ playerCode: code })
                                                 })
                                                 if (res.ok) {
-                                                    alert('연결 요청되었습니다. 관리자 승인을 기다려주세요.')
+                                                    alert('?�결 ?�청?�었?�니?? 관리자 ?�인??기다?�주?�요.')
                                                     window.location.reload()
                                                 } else {
                                                     const err = await res.json()
-                                                    alert(err.error || '연결 실패')
+                                                    alert(err.error || '?�결 ?�패')
                                                 }
-                                            } catch (e) { alert('오류 발생') }
+                                            } catch (e) { alert('?�류 발생') }
                                         }}
                                         className="bg-yellow-400 text-slate-900 px-4 rounded-xl font-bold hover:bg-yellow-300"
                                     >
-                                        연결
+                                        ?�결
                                     </button>
                                 </div>
                             </div>
@@ -351,11 +351,11 @@ export default function MePage() {
                     if (data.player.link_status !== 'ACTIVE') {
                         return (
                             <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 text-center">
-                                <div className="text-4xl mb-3">⏳</div>
-                                <h3 className="font-bold text-xl text-yellow-800 mb-2">승인 대기 중</h3>
+                                <div className="text-4xl mb-3">??/div>
+                                <h3 className="font-bold text-xl text-yellow-800 mb-2">?�인 ?��?�?/h3>
                                 <p className="text-yellow-700">
-                                    관리자가 선수 연결을 확인하고 있습니다.<br />
-                                    승인이 완료되면 모든 기능을 이용할 수 있습니다.
+                                    관리자가 ?�수 ?�결???�인?�고 ?�습?�다.<br />
+                                    ?�인???�료?�면 모든 기능???�용?????�습?�다.
                                 </p>
                             </div>
                         )
@@ -369,7 +369,7 @@ export default function MePage() {
                                 <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
                                     <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
                                         <Award size={18} className="text-purple-500" />
-                                        시즌 활동 분석 (Performance)
+                                        ?�즌 ?�동 분석 (Performance)
                                     </h2>
                                     <div className="h-64 w-full -ml-4">
                                         <ResponsiveContainer width="100%" height="100%">
@@ -407,7 +407,7 @@ export default function MePage() {
                                     {/* Recent History */}
                                     {data.abilityHistory && data.abilityHistory.length > 0 && (
                                         <div className="mt-6 border-t border-slate-100 pt-4">
-                                            <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">최근 변동 내역</h3>
+                                            <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">최근 변???�역</h3>
                                             <div className="space-y-2">
                                                 {data.abilityHistory.slice(0, 3).map(log => (
                                                     <div key={log.id} className="flex justify-between items-center text-sm">
@@ -432,7 +432,7 @@ export default function MePage() {
                                     <div className="flex items-center justify-between mb-4">
                                         <h2 className="font-bold text-slate-800 flex items-center gap-2">
                                             <Trophy size={18} className="text-yellow-500" />
-                                            내 기록
+                                            ??기록
                                         </h2>
                                         <span className="text-2xl font-black text-slate-900">{data.records.totalScore} <span className="text-sm text-slate-400 font-normal">pts</span></span>
                                     </div>
@@ -446,33 +446,33 @@ export default function MePage() {
                                             <div className="font-bold text-slate-900 text-lg">{data.records.attackPoints || 0}</div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
-                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">1등</div>
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">1??/div>
                                             <div className="font-bold text-yellow-600 text-lg">{data.records.rank1 || 0}</div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
-                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">2등</div>
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">2??/div>
                                             <div className="font-bold text-slate-600 text-lg">{data.records.rank2 || 0}</div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
-                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">3등</div>
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">3??/div>
                                             <div className="font-bold text-orange-600 text-lg">{data.records.rank3 || 0}</div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
-                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">승률</div>
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">?�률</div>
                                             <div className="font-bold text-slate-900 text-lg">
                                                 {data.records.matchesPlayed ? Math.round((data.records.wins / data.records.matchesPlayed) * 100) : 0}%
                                             </div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
-                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">골</div>
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">�?/div>
                                             <div className="font-bold text-slate-800">{data.records.goals}</div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
-                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">도움</div>
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">?��?</div>
                                             <div className="font-bold text-slate-800">{data.records.assists}</div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
-                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">승리</div>
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">?�리</div>
                                             <div className="font-bold text-slate-800">{data.records.wins}</div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
@@ -487,18 +487,18 @@ export default function MePage() {
                             <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
                                 <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
                                     <Award size={18} className="text-blue-500" />
-                                    획득 뱃지 ({data?.badges?.length || 0})
+                                    ?�득 뱃�? ({data?.badges?.length || 0})
                                 </h2>
                                 {(!data?.badges || data.badges.length === 0) ? (
                                     <div className="text-center py-8 text-slate-400 text-sm">
-                                        아직 획득한 뱃지가 없습니다.
+                                        ?�직 ?�득??뱃�?가 ?�습?�다.
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                         {data.badges.map(badge => (
                                             <div key={badge.code} className="p-3 border border-slate-100 rounded-xl bg-slate-50 flex flex-col items-center text-center">
                                                 <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center mb-2 text-xl">
-                                                    🏅
+                                                    ?��
                                                 </div>
                                                 <div className="font-bold text-sm text-slate-800">{badge.name}</div>
                                                 <div className="text-xs text-slate-500 mt-1">{badge.description}</div>
@@ -518,21 +518,21 @@ export default function MePage() {
                 <form onSubmit={handleSave} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
                     <h2 className="font-bold text-slate-800 flex items-center gap-2">
                         <User size={18} className="text-slate-400" />
-                        프로필 편집
+                        ?�로???�집
                     </h2>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">닉네임 (Alias)</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">?�네??(Alias)</label>
                         <input
                             className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                             value={form.alias}
                             onChange={(e) => setForm({ ...form, alias: e.target.value })}
-                            placeholder="닉네임을 입력하세요"
+                            placeholder="?�네?�을 ?�력?�세??
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">연락처</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">?�락�?/label>
                         <input
                             type="tel"
                             className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
@@ -544,7 +544,7 @@ export default function MePage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">생년월일</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">?�년?�일</label>
                             <input
                                 type="date"
                                 className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal"
@@ -553,7 +553,7 @@ export default function MePage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">키 (cm)</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">??(cm)</label>
                             <input
                                 type="number"
                                 className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal"
@@ -563,7 +563,7 @@ export default function MePage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">몸무게 (kg)</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">몸무�?(kg)</label>
                             <input
                                 type="number"
                                 className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal"
@@ -583,7 +583,7 @@ export default function MePage() {
                         onClick={handleLogout}
                         className="text-red-500 text-sm font-bold flex items-center gap-1 hover:bg-red-50 px-3 py-2 rounded-lg"
                     >
-                        <LogOut size={16} /> 로그아웃
+                        <LogOut size={16} /> 로그?�웃
                     </button>
 
                     <button
@@ -592,7 +592,7 @@ export default function MePage() {
                         className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/30 flex items-center gap-2 hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-50"
                     >
                         <Save size={18} />
-                        {saving ? '저장 중...' : '변경사항 저장'}
+                        {saving ? '?�??�?..' : '변경사???�??}
                     </button>
                 </div>
 
@@ -600,3 +600,5 @@ export default function MePage() {
         </div >
     )
 }
+
+

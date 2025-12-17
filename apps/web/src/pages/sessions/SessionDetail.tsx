@@ -5,17 +5,15 @@ import { cn } from '@/lib/utils'
 import html2canvas from 'html2canvas'
 
 // Define API Base URL
-const API_URL = 'http://localhost:8787'
-
 function TabOverview({ players, status }: { players: any[], status: string }) {
     return (
         <div id="capture-area-overview" className="space-y-6 bg-white p-4 rounded-xl">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                    <Users className="text-blue-600" size={20} /> 참석자 명단 ({players.length}명)
+                    <Users className="text-blue-600" size={20} /> 참석??명단 ({players.length}�?
                 </h3>
                 {players.length === 0 ? (
-                    <p className="text-slate-400 text-sm">참석자가 아직 없습니다. 관리자가 명단을 업데이트할 때까지 기다려주세요.</p>
+                    <p className="text-slate-400 text-sm">참석?��? ?�직 ?�습?�다. 관리자가 명단???�데?�트???�까지 기다?�주?�요.</p>
                 ) : (
                     <div className="flex flex-wrap gap-2">
                         {players.map((p, i) => (
@@ -28,11 +26,11 @@ function TabOverview({ players, status }: { players: any[], status: string }) {
             </div>
 
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-                <h3 className="font-bold text-blue-900 mb-2">상태: {status === 'recruiting' ? '모집 중' : status === 'closed' ? '마감됨' : '종료됨'}</h3>
+                <h3 className="font-bold text-blue-900 mb-2">?�태: {status === 'recruiting' ? '모집 �? : status === 'closed' ? '마감?? : '종료??}</h3>
                 <p className="text-blue-700 text-sm leading-relaxed">
                     {status === 'recruiting'
-                        ? '현재 참석자를 파악 중입니다. 투표가 마감되면 팀 구성이 시작됩니다.'
-                        : '참석 확인이 완료되었습니다. 팀 구성을 확인해주세요.'}
+                        ? '?�재 참석?��? ?�악 중입?�다. ?�표가 마감?�면 ?� 구성???�작?�니??'
+                        : '참석 ?�인???�료?�었?�니?? ?� 구성???�인?�주?�요.'}
                 </p>
             </div>
         </div>
@@ -79,7 +77,7 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
     // Team Characteristic Analysis
     const getTeamCharacter = (stats: { atk: number, mid: number, def: number, phys: number }) => {
         const { atk, mid, def, phys } = stats
-        if (atk === 0 && mid === 0 && def === 0) return { type: '분석 불가', emoji: '❓', strategy: '선수를 배정해주세요', color: 'text-slate-400' }
+        if (atk === 0 && mid === 0 && def === 0) return { type: '분석 불�?', emoji: '??, strategy: '?�수�?배정?�주?�요', color: 'text-slate-400' }
 
         const avg = (atk + mid + def) / 3
         const atkRatio = atk / avg
@@ -89,37 +87,37 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
         // Determine team type based on stat distribution
         if (atkRatio > 1.15 && defRatio < 0.9) {
             return {
-                type: '공격형',
-                emoji: '⚔️',
-                strategy: '적극적인 압박과 빠른 역습을 노리세요',
+                type: '공격??,
+                emoji: '?�️',
+                strategy: '?�극?�인 ?�박�?빠른 ??��???�리?�요',
                 color: 'text-red-600'
             }
         } else if (defRatio > 1.15 && atkRatio < 0.9) {
             return {
-                type: '수비형',
-                emoji: '🛡️',
-                strategy: '견고한 수비 후 카운터 어택을 노리세요',
+                type: '?�비??,
+                emoji: '?���?,
+                strategy: '견고???�비 ??카운???�택???�리?�요',
                 color: 'text-blue-600'
             }
         } else if (midRatio > 1.1) {
             return {
-                type: '점유형',
-                emoji: '🎯',
-                strategy: '볼 점유를 높이고 패스로 공간을 만드세요',
+                type: '?�유??,
+                emoji: '?��',
+                strategy: '�??�유�??�이�??�스�?공간??만드?�요',
                 color: 'text-purple-600'
             }
         } else if (phys > (atk + mid + def) * 0.35) {
             return {
-                type: '체력형',
-                emoji: '💪',
-                strategy: '후반 체력 우위로 승부하세요',
+                type: '체력??,
+                emoji: '?��',
+                strategy: '?�반 체력 ?�위�??��??�세??,
                 color: 'text-amber-600'
             }
         }
         return {
-            type: '밸런스형',
-            emoji: '⚖️',
-            strategy: '상황에 맞게 유연하게 대응하세요',
+            type: '밸런?�형',
+            emoji: '?�️',
+            strategy: '?�황??맞게 ?�연?�게 ?�?�하?�요',
             color: 'text-emerald-600'
         }
     }
@@ -129,10 +127,10 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
             {/* Unassigned Area */}
             <div className="bg-slate-100 p-4 rounded-xl border border-dashed border-slate-300">
                 <h3 className="font-bold text-slate-500 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Users size={14} /> 미배정 선수 (대기 명단)
+                    <Users size={14} /> 미배???�수 (?��?명단)
                 </h3>
                 {unassigned.length === 0 ? (
-                    <p className="text-xs text-slate-400">대기 중인 선수가 없습니다.</p>
+                    <p className="text-xs text-slate-400">?��?중인 ?�수가 ?�습?�다.</p>
                 ) : (
                     <div className="flex flex-wrap gap-2">
                         {unassigned.map(p => (
@@ -144,7 +142,7 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                         onChange={(e) => onAssign(p.id, Number(e.target.value))}
                                         value=""
                                     >
-                                        <option value="" disabled>팀 선택...</option>
+                                        <option value="" disabled>?� ?�택...</option>
                                         {teams.map(t => (
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
@@ -188,7 +186,7 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                             {displayInfo.emoji} {displayInfo.type}
                                             {aiInfo && <span className="ml-1 text-[9px] bg-purple-100 text-purple-600 px-1 rounded">AI</span>}
                                         </span>
-                                        <span className="text-xs text-slate-400">• {team.players?.length || 0}명</span>
+                                        <span className="text-xs text-slate-400">??{team.players?.length || 0}�?/span>
                                     </div>
                                 </div>
                             </div>
@@ -196,11 +194,11 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                             {/* Strategy Tip */}
                             {team.players?.length > 0 && (
                                 <div className={cn("mb-3 p-2 rounded-lg border", aiInfo ? "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-100" : "bg-white/60 border-white/80")}>
-                                    <div className="text-[10px] text-slate-500 font-medium">{aiInfo ? '🤖 AI 전략' : '💡 전략 팁'}</div>
+                                    <div className="text-[10px] text-slate-500 font-medium">{aiInfo ? '?�� AI ?�략' : '?�� ?�략 ??}</div>
                                     <div className="text-xs text-slate-700 font-medium">{displayInfo.strategy}</div>
                                     {aiInfo?.keyPlayer && (
                                         <div className="mt-1 text-[10px] text-purple-600">
-                                            ⭐ 핵심: <span className="font-bold">{aiInfo.keyPlayer}</span> - {aiInfo.keyPlayerReason}
+                                            �??�심: <span className="font-bold">{aiInfo.keyPlayer}</span> - {aiInfo.keyPlayerReason}
                                         </div>
                                     )}
                                 </div>
@@ -223,14 +221,14 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                     <span className="w-6 text-right">{stats.mid}</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                                    <span className="w-8">수비</span>
+                                    <span className="w-8">?�비</span>
                                     <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                         <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${(stats.def / (maxStat * 1.2)) * 100}%` }}></div>
                                     </div>
                                     <span className="w-6 text-right">{stats.def}</span>
                                 </div>
                                 <div className="pt-1 mt-1 border-t border-white/50 flex justify-between text-xs font-bold text-slate-500">
-                                    <span>밸런스 점수</span>
+                                    <span>밸런???�수</span>
                                     <span>{stats.total}</span>
                                 </div>
                             </div>
@@ -271,8 +269,8 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                                     }}
                                                     value={team.id}
                                                 >
-                                                    <option value={team.id} disabled>이동</option>
-                                                    <option value="unassign">미배정</option>
+                                                    <option value={team.id} disabled>?�동</option>
+                                                    <option value="unassign">미배??/option>
                                                     {teams.filter((t: any) => t.id !== team.id).map((t: any) => (
                                                         <option key={t.id} value={t.id}>{t.name}</option>
                                                     ))}
@@ -281,7 +279,7 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-sm opacity-50 text-center py-4">팀원이 없습니다.</div>
+                                    <div className="text-sm opacity-50 text-center py-4">?�?�이 ?�습?�다.</div>
                                 )}
                             </div>
                         </div>
@@ -312,7 +310,7 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
     const [selectedAssister, setSelectedAssister] = useState<string>('')
 
     const handleSaveGoal = () => {
-        if (!goalModal || !selectedScorer) return alert('득점자를 선택해주세요')
+        if (!goalModal || !selectedScorer) return alert('?�점?��? ?�택?�주?�요')
         onRecordEvent(goalModal.matchId, {
             type: 'GOAL',
             scorerId: Number(selectedScorer),
@@ -361,14 +359,14 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
                 <table className="w-full text-sm text-center">
                     <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100 text-xs uppercase tracking-wider">
                         <tr>
-                            <th className="px-4 py-3 w-12 text-left whitespace-nowrap">순위</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">팀</th>
+                            <th className="px-4 py-3 w-12 text-left whitespace-nowrap">?�위</th>
+                            <th className="px-4 py-3 text-left whitespace-nowrap">?�</th>
                             <th className="px-2 py-3 whitespace-nowrap">경기</th>
-                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">승</th>
-                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">무</th>
-                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">패</th>
-                            <th className="px-2 py-3 whitespace-nowrap">득실</th>
-                            <th className="px-4 py-3 font-bold text-blue-600 whitespace-nowrap">승점</th>
+                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">??/th>
+                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">�?/th>
+                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">??/th>
+                            <th className="px-2 py-3 whitespace-nowrap">?�실</th>
+                            <th className="px-4 py-3 font-bold text-blue-600 whitespace-nowrap">?�점</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -392,27 +390,27 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
             <div className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                        <Activity size={18} /> 매치 일정
+                        <Activity size={18} /> 매치 ?�정
                     </h3>
                     {isAdmin && (
                         <div className="flex flex-wrap gap-2 text-xs">
                             <button onClick={onRegenMatches} className="px-2 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-bold whitespace-nowrap text-[11px]">
-                                ↻ 재생성
+                                ???�생??
                             </button>
                             <button onClick={onAutoFillMatches} className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-bold whitespace-nowrap text-[11px]">
-                                + 로테이션
+                                + 로테?�션
                             </button>
                             <button onClick={onClearMatches} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold whitespace-nowrap text-[11px]">
-                                삭제
+                                ??��
                             </button>
                             <button onClick={onAddMatch} className="px-2 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-bold whitespace-nowrap text-[11px]">
-                                + 추가
+                                + 추�?
                             </button>
                         </div>
                     )}
                 </div>
 
-                {matches.length === 0 && <p className="text-slate-400 text-center py-10">일정이 없습니다.</p>}
+                {matches.length === 0 && <p className="text-slate-400 text-center py-10">?�정???�습?�다.</p>}
 
                 <div className="grid gap-3 overflow-hidden">
                     {matches.map(m => {
@@ -481,28 +479,28 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
             {goalModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-                        <h3 className="font-bold text-lg text-center">골 기록</h3>
+                        <h3 className="font-bold text-lg text-center">�?기록</h3>
                         <div>
-                            <label className="text-xs font-bold text-slate-500">득점자 (골)</label>
+                            <label className="text-xs font-bold text-slate-500">?�점??(�?</label>
                             <select
                                 value={selectedScorer}
                                 onChange={e => setSelectedScorer(e.target.value)}
                                 className="w-full mt-1 p-3 bg-slate-50 rounded-xl font-bold border border-slate-200"
                             >
-                                <option value="">선택하세요</option>
+                                <option value="">?�택?�세??/option>
                                 {teams.find(t => t.id === goalModal.teamId)?.players?.map((p: any) => (
                                     <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-slate-500">도움 (어시스트)</label>
+                            <label className="text-xs font-bold text-slate-500">?��? (?�시?�트)</label>
                             <select
                                 value={selectedAssister}
                                 onChange={e => setSelectedAssister(e.target.value)}
                                 className="w-full mt-1 p-3 bg-slate-50 rounded-xl font-bold border border-slate-200"
                             >
-                                <option value="">없음 (개인 돌파)</option>
+                                <option value="">?�음 (개인 ?�파)</option>
                                 {teams.find(t => t.id === goalModal.teamId)?.players?.filter((p: any) => p.id !== Number(selectedScorer)).map((p: any) => (
                                     <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
@@ -510,7 +508,7 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
                         </div>
                         <div className="flex gap-2 pt-2">
                             <button onClick={() => setGoalModal(null)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-600">취소</button>
-                            <button onClick={handleSaveGoal} className="flex-1 py-3 bg-blue-600 rounded-xl font-bold text-white shadow-lg shadow-blue-500/30">기록 저장</button>
+                            <button onClick={handleSaveGoal} className="flex-1 py-3 bg-blue-600 rounded-xl font-bold text-white shadow-lg shadow-blue-500/30">기록 ?�??/button>
                         </div>
                     </div>
                 </div>
@@ -521,7 +519,7 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
 
 // Helper for Season Title
 function getSeasonTitle(dateStr: string) {
-    if (!dateStr) return '정기 풋살'
+    if (!dateStr) return '?�기 ?�살'
     const date = new Date(dateStr)
     const year = date.getFullYear()
     const firstJan = new Date(year, 0, 1)
@@ -530,10 +528,10 @@ function getSeasonTitle(dateStr: string) {
     const firstWed = new Date(year, 0, 1 + diff)
 
     const msDiff = date.getTime() - firstWed.getTime()
-    if (msDiff < 0) return `${year} 프리시즌`
+    if (msDiff < 0) return `${year} ?�리?�즌`
 
     const weekNum = Math.floor(msDiff / (7 * 24 * 60 * 60 * 1000)) + 1
-    return `${year}시즌 ${weekNum}경기`
+    return `${year}?�즌 ${weekNum}경기`
 }
 
 export default function SessionDetail() {
@@ -562,7 +560,7 @@ export default function SessionDetail() {
                     setActiveTab('teams')
                 }
             })
-            .catch(() => setError('세션을 찾을 수 없거나 연결 실패'))
+            .catch(() => setError('?�션??찾을 ???�거???�결 ?�패'))
     }, [id])
 
     const refreshSession = async () => {
@@ -595,8 +593,8 @@ export default function SessionDetail() {
 
         const totalCount = parseResult.matched.length + parseResult.unknown.length
         const confirmMsg = parseResult.unknown.length > 0
-            ? `기존 회원 ${parseResult.matched.length}명과 신규(미등록) ${parseResult.unknown.length}명을 포함하여 총 ${totalCount}명을 등록하시겠습니까?\n(신규 회원은 자동 생성됩니다)`
-            : `총 ${totalCount}명의 참석자를 등록하시겠습니까?`
+            ? `기존 ?�원 ${parseResult.matched.length}명과 ?�규(미등�? ${parseResult.unknown.length}명을 ?�함?�여 �?${totalCount}명을 ?�록?�시겠습?�까?\n(?�규 ?�원?� ?�동 ?�성?�니??`
+            : `�?${totalCount}명의 참석?��? ?�록?�시겠습?�까?`
 
         if (!confirm(confirmMsg)) return
 
@@ -619,7 +617,7 @@ export default function SessionDetail() {
                 }))
                 playerIds = [...playerIds, ...newIds]
             } catch (e) {
-                alert('신규 회원 생성 중 오류가 발생했습니다.')
+                alert('?�규 ?�원 ?�성 �??�류가 발생?�습?�다.')
                 return
             }
         }
@@ -633,15 +631,15 @@ export default function SessionDetail() {
             },
             body: JSON.stringify({ player_ids: playerIds })
         })
-        alert('저장되었습니다.')
+        alert('?�?�되?�습?�다.')
         setParseResult(null)
         setParseText('')
         refreshSession()
     }
 
     const handleStatusChange = async (newStatus: string) => {
-        if (newStatus === 'closed' && !confirm('마감 처리 하시겠습니까? 더 이상 참석자를 수정할 수 없게 됩니다.')) return
-        if (newStatus === 'recruiting' && !confirm('마감을 취소하고 다시 모집 중으로 변경하시겠습니까?')) return
+        if (newStatus === 'closed' && !confirm('마감 처리 ?�시겠습?�까? ???�상 참석?��? ?�정?????�게 ?�니??')) return
+        if (newStatus === 'recruiting' && !confirm('마감??취소?�고 ?�시 모집 중으�?변경하?�겠?�니�?')) return
 
         const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
         await fetch(`${API_URL}/sessions/${id}/status`, {
@@ -659,7 +657,7 @@ export default function SessionDetail() {
 
     // Generate Teams
     const handleGenerateTeams = async () => {
-        if (!confirm('기존 팀 구성이 모두 초기화되고 새로 생성됩니다. 계속하시겠습니까? (덮어쓰기)')) return
+        if (!confirm('기존 ?� 구성??모두 초기?�되�??�로 ?�성?�니?? 계속?�시겠습?�까? (??��?�기)')) return
         try {
             const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
             const res = await fetch(`${API_URL}/sessions/${id}/teams/generate`, {
@@ -674,21 +672,21 @@ export default function SessionDetail() {
             if (res.ok && data.success) {
                 // Show balance info
                 const score = Math.round(data.balanceScore || 0)
-                const msg = `✅ 팀 생성 완료!\n\n밸런스 점수: ${score}점\n\n` +
-                    `📋 생성 요약:\n` +
-                    `- ${data.teams?.length || 0}개 팀 구성\n` +
-                    `- ${data.match_count || 0}경기 생성\n` +
-                    (score >= 80 ? '⭐ 아주 균형잡힌 팀 구성입니다!' :
-                        score >= 60 ? '👍 적절한 밸런스입니다.' :
-                            '⚠️ 선수 능력치 편차가 있습니다.')
+                const msg = `???� ?�성 ?�료!\n\n밸런???�수: ${score}??n\n` +
+                    `?�� ?�성 ?�약:\n` +
+                    `- ${data.teams?.length || 0}�??� 구성\n` +
+                    `- ${data.match_count || 0}경기 ?�성\n` +
+                    (score >= 80 ? '�??�주 균형?�힌 ?� 구성?�니??' :
+                        score >= 60 ? '?�� ?�절??밸런?�입?�다.' :
+                            '?�️ ?�수 ?�력�??�차가 ?�습?�다.')
                 alert(msg)
                 window.location.reload()
             } else {
-                alert('팀 생성 실패: ' + (data.error || '알 수 없는 오류'))
+                alert('?� ?�성 ?�패: ' + (data.error || '?????�는 ?�류'))
             }
         } catch (error) {
             console.error(error)
-            alert('팀 생성 중 오류가 발생했습니다.')
+            alert('?� ?�성 �??�류가 발생?�습?�다.')
         }
     }
 
@@ -721,18 +719,18 @@ export default function SessionDetail() {
             refreshSession() // Reload session to get updated scores
         } catch (error) {
             console.error(error)
-            alert('기록 실패')
+            alert('기록 ?�패')
         }
     }
 
     const handleClearMatches = async () => {
-        if (!confirm('모든 경기를 삭제하시겠습니까?')) return
+        if (!confirm('모든 경기�???��?�시겠습?�까?')) return
         await fetch(`${API_URL}/sessions/${id}/matches`, { method: 'DELETE' })
         refreshSession()
     }
 
     const handleRegenMatches = async () => {
-        if (!confirm('기존 경기를 삭제하고 9경기를 새로 생성합니다.')) return
+        if (!confirm('기존 경기�???��?�고 9경기�??�로 ?�성?�니??')) return
         await fetch(`${API_URL}/sessions/${id}/matches/generate`, { method: 'POST' })
         refreshSession()
     }
@@ -743,7 +741,7 @@ export default function SessionDetail() {
     }
 
     const handleAddMatch = async () => {
-        if (!session.teams || session.teams.length < 2) return alert('팀이 최소 2개 필요합니다.')
+        if (!session.teams || session.teams.length < 2) return alert('?�??최소 2�??�요?�니??')
 
         await fetch(`${API_URL}/matches`, {
             method: 'POST',
@@ -758,7 +756,7 @@ export default function SessionDetail() {
     }
 
     const handleDeleteMatch = async (mid: number) => {
-        if (!confirm('경기를 삭제하시겠습니까?')) return
+        if (!confirm('경기�???��?�시겠습?�까?')) return
         await fetch(`${API_URL}/matches/${mid}`, { method: 'DELETE' })
         refreshSession()
     }
@@ -797,7 +795,7 @@ export default function SessionDetail() {
             link.click()
         } catch (e) {
             console.error('Capture failed', e)
-            alert('이미지 저장에 실패했습니다.')
+            alert('?��?지 ?�?�에 ?�패?�습?�다.')
         }
     }
 
@@ -817,18 +815,18 @@ export default function SessionDetail() {
 
     if (error) return (
         <div className="p-20 text-center">
-            <h2 className="text-xl font-bold text-slate-700 mb-2">오류 발생</h2>
+            <h2 className="text-xl font-bold text-slate-700 mb-2">?�류 발생</h2>
             <p className="text-slate-500">{error}</p>
-            <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-slate-200 rounded text-slate-700 font-bold">새로고침</button>
+            <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-slate-200 rounded text-slate-700 font-bold">?�로고침</button>
         </div>
     )
 
-    if (!session) return <div className="p-20 text-center text-slate-500 animate-pulse">데이터 로딩 중...</div>
+    if (!session) return <div className="p-20 text-center text-slate-500 animate-pulse">?�이??로딩 �?..</div>
 
     const tabs = [
         { id: 'overview' as const, label: '개요/참석', icon: ClipboardList },
-        { id: 'teams' as const, label: '팀 구성 (수동)', icon: Shield },
-        { id: 'scoreboard' as const, label: '점수판', icon: Activity },
+        { id: 'teams' as const, label: '?� 구성 (?�동)', icon: Shield },
+        { id: 'scoreboard' as const, label: '?�수??, icon: Activity },
     ]
 
     return (
@@ -839,7 +837,7 @@ export default function SessionDetail() {
                     onClick={handleCapture}
                     className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 font-bold"
                 >
-                    <Download size={14} /> 이미지 저장
+                    <Download size={14} /> ?��?지 ?�??
                 </button>
             </div>
 
@@ -859,7 +857,7 @@ export default function SessionDetail() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <h1 className="text-3xl font-extrabold text-slate-900">{getSeasonTitle(session.session_date)}</h1>
                     <div className="flex items-center gap-4 text-slate-500 text-sm font-medium">
-                        <span className="flex items-center gap-1"><MapPin size={16} /> 경북대 A구장</span>
+                        <span className="flex items-center gap-1"><MapPin size={16} /> 경북?� A구장</span>
                     </div>
                 </div>
             </div>
@@ -868,18 +866,18 @@ export default function SessionDetail() {
             {isAdmin && (
                 <div className="bg-slate-900 rounded-2xl p-6 mb-8 text-white shadow-xl">
                     <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <Lock size={18} className="text-yellow-400" /> 관리자 컨트롤 패널
+                        <Lock size={18} className="text-yellow-400" /> 관리자 컨트�??�널
                     </h2>
 
                     {/* Step 1: Manage Attendees (Only if recruiting) */}
                     {session.status === 'recruiting' && (
                         <div className="space-y-4 mb-8 border-b border-slate-700 pb-6">
                             <label className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                                <Wand2 size={14} /> 카카오톡 투표 붙여넣기 (참석자 갱신)
+                                <Wand2 size={14} /> 카카?�톡 ?�표 붙여?�기 (참석??갱신)
                             </label>
                             <textarea
                                 className="w-full h-32 p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm font-mono text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="카톡 내용을 붙여넣으세요..."
+                                placeholder="카톡 ?�용??붙여?�으?�요..."
                                 value={parseText}
                                 onChange={(e) => setParseText(e.target.value)}
                             />
@@ -889,7 +887,7 @@ export default function SessionDetail() {
                                     disabled={parsing || !parseText}
                                     className="px-4 py-2 bg-blue-600 rounded-lg text-sm font-bold hover:bg-blue-500 disabled:opacity-50"
                                 >
-                                    {parsing ? '분석 중...' : '1. 분석하기'}
+                                    {parsing ? '분석 �?..' : '1. 분석?�기'}
                                 </button>
 
                                 {parseResult && (
@@ -897,7 +895,7 @@ export default function SessionDetail() {
                                         onClick={handleSaveAttendees}
                                         className="px-4 py-2 bg-emerald-600 rounded-lg text-sm font-bold hover:bg-emerald-500 animate-pulse"
                                     >
-                                        2. 결과 저장 (기존 {parseResult.matched.length}명 + 신규 {parseResult.unknown.length}명)
+                                        2. 결과 ?�??(기존 {parseResult.matched.length}�?+ ?�규 {parseResult.unknown.length}�?
                                     </button>
                                 )}
                             </div>
@@ -912,7 +910,7 @@ export default function SessionDetail() {
                                         ))}
                                         {parseResult.unknown.map((name, i) => (
                                             <span key={`u-${i}`} className="px-2 py-1 bg-yellow-900/50 text-yellow-400 border border-yellow-800 rounded text-xs flex items-center gap-1">
-                                                <Wand2 size={10} /> {name} (신규)
+                                                <Wand2 size={10} /> {name} (?�규)
                                             </span>
                                         ))}
                                     </div>
@@ -933,12 +931,12 @@ export default function SessionDetail() {
                         ) : (
                             <div className="flex items-center gap-2">
                                 <button className="px-6 py-3 bg-slate-700 text-slate-400 rounded-xl font-bold flex items-center gap-2 cursor-not-allowed">
-                                    <Lock size={18} /> 마감 완료됨
+                                    <Lock size={18} /> 마감 ?�료??
                                 </button>
                                 <button
                                     onClick={() => handleStatusChange('recruiting')}
                                     className="px-4 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-700 hover:text-white border border-slate-700"
-                                    title="마감 취소 (다시 모집 중으로 변경)"
+                                    title="마감 취소 (?�시 모집 중으�?변�?"
                                 >
                                     <RefreshCw size={18} /> 마감 취소
                                 </button>
@@ -957,7 +955,7 @@ export default function SessionDetail() {
                                     : "bg-slate-800 text-slate-500 cursor-not-allowed"
                             )}
                         >
-                            <Shield size={18} /> 팀 자동 생성
+                            <Shield size={18} /> ?� ?�동 ?�성
                         </button>
                     </div>
                 </div>
@@ -1014,3 +1012,5 @@ export default function SessionDetail() {
         </div>
     )
 }
+
+

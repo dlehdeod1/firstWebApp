@@ -20,7 +20,7 @@ export default function LoginPage() {
         // Let's implement real API call.
 
         try {
-            const res = await fetch('http://localhost:8787/auth/login', {
+            const res = await fetch('${API_URL}/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -39,11 +39,11 @@ export default function LoginPage() {
                 navigate('/')
                 window.location.reload()
             } else {
-                setError(data.error || '로그인 실패')
+                setError(data.error || '로그???�패')
             }
         } catch (err) {
             console.error(err)
-            setError('서버 연결 오류')
+            setError('?�버 ?�결 ?�류')
         }
     }
 
@@ -54,13 +54,13 @@ export default function LoginPage() {
                     <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white shadow-lg shadow-blue-500/30">
                         <Lock size={32} />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">로그인</h1>
-                    <p className="text-slate-500 mt-2">아이디로 로그인하세요.</p>
+                    <h1 className="text-2xl font-bold text-slate-900">로그??/h1>
+                    <p className="text-slate-500 mt-2">?�이?�로 로그?�하?�요.</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">아이디 (ID)</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">?�이??(ID)</label>
                         <input
                             type="text"
                             className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
@@ -70,11 +70,11 @@ export default function LoginPage() {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">비밀번호</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">비�?번호</label>
                         <input
                             type="password"
                             className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="••••••••"
+                            placeholder="?�••••••�?
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                         />
@@ -90,15 +90,17 @@ export default function LoginPage() {
                         type="submit"
                         className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-lg"
                     >
-                        로그인
+                        로그??
                     </button>
 
                     <div className="text-center mt-4">
-                        <span className="text-slate-500 text-sm">계정이 없으신가요? </span>
-                        <a href="/signup" className="text-blue-600 font-bold text-sm hover:underline">회원가입</a>
+                        <span className="text-slate-500 text-sm">계정???�으?��??? </span>
+                        <a href="/signup" className="text-blue-600 font-bold text-sm hover:underline">?�원가??/a>
                     </div>
                 </form>
             </div>
         </div>
     )
 }
+
+
