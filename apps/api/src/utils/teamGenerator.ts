@@ -117,6 +117,11 @@ export class TeamBalancer {
         // 3. Optimization Loop (Swap)
         // Simple Hill Climbing: Try random swaps, if better, keep it.
         let currentVariance = this.calculateVariance(teams);
+        let currentChemistry = this.calculateTotalChemistry(teams);
+        let currentScore = currentVariance - (currentChemistry * 2.0);
+
+        // logs.push(`Initial Score: ${currentScore.toFixed(1)} (Var: ${currentVariance.toFixed(1)}, Chem: ${currentChemistry})`);
+
         let iterations = 1000;
 
         for (let i = 0; i < iterations; i++) {
@@ -129,31 +134,33 @@ export class TeamBalancer {
             const p1Idx = Math.floor(Math.random() * teams[t1Idx].length);
             const p2Idx = Math.floor(Math.random() * teams[t2Idx].length);
 
-            // Swap
             const p1 = teams[t1Idx][p1Idx];
             const p2 = teams[t2Idx][p2Idx];
 
+            // Swap
             teams[t1Idx][p1Idx] = p2;
             teams[t2Idx][p2Idx] = p1;
 
             const newVariance = this.calculateVariance(teams);
+            const newChemistry = this.calculateTotalChemistry(teams);
 
-            // Minimize Variance (Lower is better)
-            // Also consider Chemistry?
-            // Requirement: "Local swap search reduces power deviation + chemistry increase"
-            // Let's add chemistry score to the objective function.
-            // Objective = Variance - (ChemistryFactor * TotalChemistry)
-            // We want to Minimize Objective.
+            // Objective: Minimize Variance, Maximize Chemistry
+            // Cost = Variance - (Chemistry * 2.0)
+            const newScore = newVariance - (newChemistry * 2.0);
 
-            if (newVariance < currentVariance) {
+            if (newScore < currentScore) {
+                currentScore = newScore;
                 currentVariance = newVariance;
-                logs.push(`Swap ${p1.name} <-> ${p2.name}: Variance improved to ${newVariance.toFixed(2)}`);
+                logs.push(`Swap ${p1.name} <-> ${p2.name}: Var ${newVariance.toFixed(1)}, Chem ${newChemistry}, Score ${newScore.toFixed(1)}`);
             } else {
                 // Revert
                 teams[t1Idx][p1Idx] = p1;
                 teams[t2Idx][p2Idx] = p2;
             }
         }
+
+        const finalChemistry = this.calculateTotalChemistry(teams);
+        logs.push(`Final Variety: ${currentVariance.toFixed(2)}, Final Chemistry: ${finalChemistry}`);
 
         // formatting result
         const finalTeams: Team[] = teams.map((tp, idx) => ({
@@ -175,5 +182,30 @@ export class TeamBalancer {
         const max = Math.max(...scores);
         const min = Math.min(...scores);
         return max - min;
+    }
+
+    private calculateTotalChemistry(teams: PlayerStats[][]): number {
+        let total = 0;
+        // Pre-calculate map for O(1) lookup if needed, but array is small.
+        // Or just iterate edges and check if both in same team? No, iterating players is safer.
+
+        // Optimize: Convert chemistry list to Map<"id-id", score>
+        const chemMap = new Map<string, number>();
+        this.chemistry.forEach(c => {
+            const key = [c.player_a_id, c.player_b_id].sort((a, b) => a - b).join('-');
+            chemMap.set(key, c.score);
+        });
+
+        for (const team of teams) {
+            for (let i = 0; i < team.length; i++) {
+                for (let j = i + 1; j < team.length; j++) {
+                    const p1 = team[i].id;
+                    const p2 = team[j].id;
+                    const key = [p1, p2].sort((a, b) => a - b).join('-');
+                    total += (chemMap.get(key) || 0);
+                }
+            }
+        }
+        return total;
     }
 }

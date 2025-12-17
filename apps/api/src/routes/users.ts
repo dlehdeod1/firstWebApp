@@ -234,4 +234,62 @@ users.post('/me/claim-player', async (c) => {
     }
 })
 
+// Get Preferences (Chemistry)
+users.get('/me/preferences', async (c) => {
+    const userId = getUserIdFromToken(c)
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+
+    const player = await c.env.DB.prepare('SELECT id FROM players WHERE user_id = ?').bind(userId).first<{ id: number }>()
+    if (!player) return c.json({ preferences: [] })
+
+    const { results } = await c.env.DB.prepare(`
+        SELECT pp.rank, pp.target_player_id, p.name 
+        FROM player_preferences pp
+        JOIN players p ON pp.target_player_id = p.id
+        WHERE pp.player_id = ?
+        ORDER BY pp.rank ASC
+    `).bind(player.id).all()
+
+    return c.json({ preferences: results || [] })
+})
+
+// Update Preferences
+users.put('/me/preferences', async (c) => {
+    const userId = getUserIdFromToken(c)
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+
+    const { preferences } = await c.req.json() // [{ targetId: 1, rank: 1}, ...]
+    if (!Array.isArray(preferences)) return c.json({ error: 'Invalid data' }, 400)
+    if (preferences.length > 3) return c.json({ error: 'Max 3 preferences' }, 400)
+
+    const player = await c.env.DB.prepare('SELECT id FROM players WHERE user_id = ?').bind(userId).first<{ id: number }>()
+    if (!player) return c.json({ error: 'Player not linked' }, 404)
+
+    // Transaction: Delete existing -> Insert new
+    // Validate uniqueness of targets
+    const targetIds = preferences.map(p => p.targetId)
+    if (new Set(targetIds).size !== targetIds.length) {
+        return c.json({ error: 'Duplicate players selected' }, 400)
+    }
+
+    try {
+        const batch = [
+            c.env.DB.prepare('DELETE FROM player_preferences WHERE player_id = ?').bind(player.id)
+        ]
+
+        const stmt = c.env.DB.prepare('INSERT INTO player_preferences (player_id, target_player_id, rank) VALUES (?, ?, ?)')
+        preferences.forEach((p: any) => {
+            if (p.targetId && p.rank) {
+                batch.push(stmt.bind(player.id, p.targetId, p.rank))
+            }
+        })
+
+        await c.env.DB.batch(batch)
+        return c.json({ success: true })
+    } catch (e: any) {
+        console.error(e)
+        return c.json({ error: 'Failed to update preferences' }, 500)
+    }
+})
+
 export default users

@@ -71,13 +71,16 @@ export class BadgeService {
         return {
             records: {
                 wins: stats.rank1,
+                rank1: stats.rank1,
+                rank2: stats.rank2,
+                rank3: stats.rank3,
                 podiums: stats.rank1 + stats.rank2 + stats.rank3,
                 goals: stats.goals,
                 assists: stats.assists,
                 attackPoints: stats.attackPoints,
                 attendance: stats.attendance,
                 matchesPlayed: stats.matchesPlayed,
-                totalScore: 0 // score removed from v1 requirement? I'll keep 0 or calculation
+                totalScore: 0
             },
             badges: badges.results || []
         }

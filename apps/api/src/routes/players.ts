@@ -24,6 +24,20 @@ const checkAdmin = async (c: any) => {
     return user?.role === 'ADMIN'
 }
 
+// ADMIN: Get All Player Preferences
+players.get('/preferences', async (c) => {
+    if (!await checkAdmin(c)) return c.json({ error: 'Unauthorized' }, 401)
+
+    const { results } = await c.env.DB.prepare(`
+        SELECT pp.player_id, pp.rank, p.name as target_name
+        FROM player_preferences pp
+        JOIN players p ON pp.target_player_id = p.id
+        ORDER BY pp.player_id, pp.rank
+    `).all()
+
+    return c.json(results || [])
+})
+
 players.get('/:id/stats', async (c) => {
     const id = Number(c.req.param('id'))
     const stats = await BadgeService.getStatsByPlayerId(c.env.DB, id)

@@ -51,43 +51,6 @@ const DEFAULT_STATS = {
     physical: 5,
 };
 
-/* -------------------------------------------------------------------------- */
-/* StatInput – reusable number input with +/- buttons                         */
-/* -------------------------------------------------------------------------- */
-const StatInput = ({
-    label,
-    value,
-    onChange,
-    color = 'bg-slate-50',
-}: {
-    label: string;
-    value: number;
-    onChange: (v: number) => void;
-    color?: string;
-}) => (
-    <div className={`p-4 rounded-2xl border border-slate-100 ${color}`}>
-        <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
-            {label}
-        </div>
-        <div className="flex items-center gap-3">
-            <button
-                onClick={() => onChange(Math.max(1, value - 1))}
-                className="w-8 h-8 rounded-full bg-white shadow-sm border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 font-bold"
-            >
-                -
-            </button>
-            <div className="flex-1 text-center font-black text-2xl text-slate-800 tabular-nums">
-                {value}
-            </div>
-            <button
-                onClick={() => onChange(Math.min(10, value + 1))}
-                className="w-8 h-8 rounded-full bg-white shadow-sm border border-slate-200 flex items-center justify-center text-blue-500 hover:text-blue-600 hover:border-blue-300 font-bold"
-            >
-                +
-            </button>
-        </div>
-    </div>
-);
 
 /* -------------------------------------------------------------------------- */
 /* StatCell – table cell with a numeric input                                 */
@@ -134,7 +97,7 @@ export default function PlayerEditor() {
     const [users, setUsers] = useState<
         { id: string; username: string; email: string }[]
     >([]);
-    const [selectedUser, setSelectedUser] = useState('');
+    const [selectedUser, _setSelectedUser] = useState('');
     const [modified, setModified] = useState<Record<number, Player>>({});
     const [currentUserRole, setCurrentUserRole] = useState('');
     const [roleLoaded, setRoleLoaded] = useState(false);
@@ -579,8 +542,8 @@ export default function PlayerEditor() {
                                             <div className={cn(
                                                 "text-base font-black",
                                                 stat.value >= 8 ? "text-green-600" :
-                                                stat.value >= 6 ? "text-blue-600" :
-                                                stat.value >= 4 ? "text-slate-700" : "text-orange-500"
+                                                    stat.value >= 6 ? "text-blue-600" :
+                                                        stat.value >= 4 ? "text-slate-700" : "text-orange-500"
                                             )}>{stat.value}</div>
                                         </div>
                                     ))}
@@ -641,254 +604,254 @@ export default function PlayerEditor() {
             {/* Player Table (Desktop View)                                        */}
             {/* ------------------------------------------------------------------ */}
             {viewMode === 'table' && (
-            <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-                <table className="w-full bg-white text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">ID</th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">이름</th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">코드</th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">역할</th>
-                            <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">연결</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">슈팅</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">침투</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">키핑</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">패스</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">차단</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">마킹</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">체력</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">속도</th>
-                            <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">피지컬</th>
-                            {canEdit && <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">액션</th>}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {filteredPlayers.map((p, idx) => (
-                            <tr key={p.id} className={cn("hover:bg-slate-50 transition-colors", idx % 2 === 0 ? "bg-white" : "bg-slate-25")}>
-                                <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{p.id}</td>
-                                <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{p.name}</td>
-                                <td className="px-3 py-2.5 font-mono text-xs text-slate-400 whitespace-nowrap">{p.player_code ?? '-'}</td>
-                                <td className="px-4 py-2 text-sm">
-                                    {p.user_id && canEdit ? (
-                                        <select
-                                            value={p.role || 'member'}
-                                            onChange={async (e) => {
-                                                const newRole = e.target.value;
-                                                const token = localStorage.getItem('auth_token');
-                                                try {
-                                                    const res = await fetch(`${API_URL}/users/${p.user_id}/role`, {
-                                                        method: 'PATCH',
-                                                        headers: {
-                                                            'Content-Type': 'application/json',
-                                                            'Authorization': `Bearer ${token}`
-                                                        },
-                                                        body: JSON.stringify({ role: newRole })
-                                                    });
-                                                    if (res.ok) {
-                                                        setPlayers(prev => prev.map(player =>
-                                                            player.id === p.id ? { ...player, role: newRole } : player
-                                                        ));
-                                                    } else {
-                                                        const err = await res.json();
-                                                        alert(err.error || '역할 변경 실패');
-                                                    }
-                                                } catch (e) {
-                                                    console.error(e);
-                                                    alert('역할 변경 중 오류 발생');
-                                                }
-                                            }}
-                                            className="border rounded px-2 py-1 text-xs"
-                                        >
-                                            <option value="member">일반회원</option>
-                                            <option value="MATCH_RECORDER">기록원</option>
-                                            <option value="OWNER">구단주</option>
-                                            <option value="ADMIN">관리자</option>
-                                            <option value="GUEST">게스트</option>
-                                        </select>
-                                    ) : p.user_id ? (
-                                        <span className={cn(
-                                            "px-2 py-1 rounded text-xs font-medium",
-                                            p.role === 'ADMIN' && "bg-red-100 text-red-700",
-                                            p.role === 'OWNER' && "bg-purple-100 text-purple-700",
-                                            p.role === 'MATCH_RECORDER' && "bg-yellow-100 text-yellow-700",
-                                            (!p.role || p.role === 'member') && "bg-slate-100 text-slate-600"
-                                        )}>
-                                            {p.role === 'ADMIN' ? '관리자' : p.role === 'OWNER' ? '구단주' : p.role === 'MATCH_RECORDER' ? '기록원' : '일반회원'}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-400">-</span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {p.user_username ? (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium bg-blue-50 text-blue-600 px-2 py-1 rounded">{p.user_username}</span>
-                                            {canEdit && (
-                                                <button
-                                                    onClick={() => handleUnlinkUser(p.id)}
-                                                    className="text-red-400 hover:text-red-600"
-                                                    title="연결 해제"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    ) : canEdit ? (
-                                        <div className="flex items-center gap-1">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                    <table className="w-full bg-white text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">ID</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">이름</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">코드</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">역할</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">연결</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">슈팅</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">침투</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">키핑</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">패스</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">차단</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">마킹</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">체력</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">속도</th>
+                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">피지컬</th>
+                                {canEdit && <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">액션</th>}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredPlayers.map((p, idx) => (
+                                <tr key={p.id} className={cn("hover:bg-slate-50 transition-colors", idx % 2 === 0 ? "bg-white" : "bg-slate-25")}>
+                                    <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{p.id}</td>
+                                    <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{p.name}</td>
+                                    <td className="px-3 py-2.5 font-mono text-xs text-slate-400 whitespace-nowrap">{p.player_code ?? '-'}</td>
+                                    <td className="px-4 py-2 text-sm">
+                                        {p.user_id && canEdit ? (
                                             <select
-                                                value={(p as any)._selectedUser || ''}
-                                                onChange={(e) => {
-                                                    setPlayers(prev => prev.map(player =>
-                                                        player.id === p.id
-                                                            ? { ...player, _selectedUser: e.target.value } as any
-                                                            : player
-                                                    ));
-                                                }}
-                                                className="border rounded px-2 py-1 text-xs w-28"
-                                            >
-                                                <option value="">사용자 선택</option>
-                                                {users
-                                                    .filter((u) => !linkedUserIds.has(u.id))
-                                                    .map((u) => (
-                                                        <option key={u.id} value={u.id}>
-                                                            {u.username}
-                                                        </option>
-                                                    ))}
-                                            </select>
-                                            <button
-                                                onClick={async () => {
-                                                    const userId = (p as any)._selectedUser;
-                                                    if (!userId) {
-                                                        alert('사용자를 선택해주세요.');
-                                                        return;
-                                                    }
+                                                value={p.role || 'member'}
+                                                onChange={async (e) => {
+                                                    const newRole = e.target.value;
                                                     const token = localStorage.getItem('auth_token');
                                                     try {
-                                                        const res = await fetch(`${API_URL}/players/${p.id}/link-user`, {
-                                                            method: 'POST',
+                                                        const res = await fetch(`${API_URL}/users/${p.user_id}/role`, {
+                                                            method: 'PATCH',
                                                             headers: {
                                                                 'Content-Type': 'application/json',
                                                                 'Authorization': `Bearer ${token}`
                                                             },
-                                                            body: JSON.stringify({ userId }),
+                                                            body: JSON.stringify({ role: newRole })
                                                         });
                                                         if (res.ok) {
-                                                            alert('연결되었습니다.');
-                                                            fetchPlayers();
+                                                            setPlayers(prev => prev.map(player =>
+                                                                player.id === p.id ? { ...player, role: newRole } : player
+                                                            ));
                                                         } else {
                                                             const err = await res.json();
-                                                            alert(err.error || '연결에 실패했습니다.');
+                                                            alert(err.error || '역할 변경 실패');
                                                         }
                                                     } catch (e) {
                                                         console.error(e);
+                                                        alert('역할 변경 중 오류 발생');
                                                     }
                                                 }}
-                                                className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
-                                                title="연결 확인"
+                                                className="border rounded px-2 py-1 text-xs"
                                             >
-                                                연결
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        '-'
-                                    )}
-                                </td>
+                                                <option value="member">일반회원</option>
+                                                <option value="MATCH_RECORDER">기록원</option>
+                                                <option value="OWNER">구단주</option>
+                                                <option value="ADMIN">관리자</option>
+                                                <option value="GUEST">게스트</option>
+                                            </select>
+                                        ) : p.user_id ? (
+                                            <span className={cn(
+                                                "px-2 py-1 rounded text-xs font-medium",
+                                                p.role === 'ADMIN' && "bg-red-100 text-red-700",
+                                                p.role === 'OWNER' && "bg-purple-100 text-purple-700",
+                                                p.role === 'MATCH_RECORDER' && "bg-yellow-100 text-yellow-700",
+                                                (!p.role || p.role === 'member') && "bg-slate-100 text-slate-600"
+                                            )}>
+                                                {p.role === 'ADMIN' ? '관리자' : p.role === 'OWNER' ? '구단주' : p.role === 'MATCH_RECORDER' ? '기록원' : '일반회원'}
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-400">-</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        {p.user_username ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium bg-blue-50 text-blue-600 px-2 py-1 rounded">{p.user_username}</span>
+                                                {canEdit && (
+                                                    <button
+                                                        onClick={() => handleUnlinkUser(p.id)}
+                                                        className="text-red-400 hover:text-red-600"
+                                                        title="연결 해제"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : canEdit ? (
+                                            <div className="flex items-center gap-1">
+                                                <select
+                                                    value={(p as any)._selectedUser || ''}
+                                                    onChange={(e) => {
+                                                        setPlayers(prev => prev.map(player =>
+                                                            player.id === p.id
+                                                                ? { ...player, _selectedUser: e.target.value } as any
+                                                                : player
+                                                        ));
+                                                    }}
+                                                    className="border rounded px-2 py-1 text-xs w-28"
+                                                >
+                                                    <option value="">사용자 선택</option>
+                                                    {users
+                                                        .filter((u) => !linkedUserIds.has(u.id))
+                                                        .map((u) => (
+                                                            <option key={u.id} value={u.id}>
+                                                                {u.username}
+                                                            </option>
+                                                        ))}
+                                                </select>
+                                                <button
+                                                    onClick={async () => {
+                                                        const userId = (p as any)._selectedUser;
+                                                        if (!userId) {
+                                                            alert('사용자를 선택해주세요.');
+                                                            return;
+                                                        }
+                                                        const token = localStorage.getItem('auth_token');
+                                                        try {
+                                                            const res = await fetch(`${API_URL}/players/${p.id}/link-user`, {
+                                                                method: 'POST',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json',
+                                                                    'Authorization': `Bearer ${token}`
+                                                                },
+                                                                body: JSON.stringify({ userId }),
+                                                            });
+                                                            if (res.ok) {
+                                                                alert('연결되었습니다.');
+                                                                fetchPlayers();
+                                                            } else {
+                                                                const err = await res.json();
+                                                                alert(err.error || '연결에 실패했습니다.');
+                                                            }
+                                                        } catch (e) {
+                                                            console.error(e);
+                                                        }
+                                                    }}
+                                                    className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
+                                                    title="연결 확인"
+                                                >
+                                                    연결
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            '-'
+                                        )}
+                                    </td>
 
-                                {/* Stat columns – editable only if canEdit. But wait, `StatCell` uses `onChange`.
+                                    {/* Stat columns – editable only if canEdit. But wait, `StatCell` uses `onChange`.
                     If !canEdit, we should probably disable input or render text.
                     I added `disabled` prop to StatCell.
                 */}
-                                <StatCell
-                                    value={p.shooting}
-                                    onChange={(v) => handleStatChange(p.id, 'shooting', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.offball_run}
-                                    onChange={(v) => handleStatChange(p.id, 'offball_run', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.ball_keeping}
-                                    onChange={(v) => handleStatChange(p.id, 'ball_keeping', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.passing}
-                                    onChange={(v) => handleStatChange(p.id, 'passing', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.intercept}
-                                    onChange={(v) => handleStatChange(p.id, 'intercept', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.marking}
-                                    onChange={(v) => handleStatChange(p.id, 'marking', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.stamina}
-                                    onChange={(v) => handleStatChange(p.id, 'stamina', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.speed}
-                                    onChange={(v) => handleStatChange(p.id, 'speed', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
-                                <StatCell
-                                    value={p.physical || 5}
-                                    onChange={(v) => handleStatChange(p.id, 'physical', v)}
-                                    bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
-                                    disabled={!canEdit}
-                                />
+                                    <StatCell
+                                        value={p.shooting}
+                                        onChange={(v) => handleStatChange(p.id, 'shooting', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.offball_run}
+                                        onChange={(v) => handleStatChange(p.id, 'offball_run', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.ball_keeping}
+                                        onChange={(v) => handleStatChange(p.id, 'ball_keeping', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.passing}
+                                        onChange={(v) => handleStatChange(p.id, 'passing', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.intercept}
+                                        onChange={(v) => handleStatChange(p.id, 'intercept', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.marking}
+                                        onChange={(v) => handleStatChange(p.id, 'marking', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.stamina}
+                                        onChange={(v) => handleStatChange(p.id, 'stamina', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.speed}
+                                        onChange={(v) => handleStatChange(p.id, 'speed', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
+                                    <StatCell
+                                        value={p.physical || 5}
+                                        onChange={(v) => handleStatChange(p.id, 'physical', v)}
+                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        disabled={!canEdit}
+                                    />
 
-                                {canEdit && (
-                                    <td className="px-4 py-2 flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                setEditing(p);
-                                                setIsNew(false);
-                                            }}
-                                            className="text-blue-600 hover:text-blue-800"
-                                            title="수정"
-                                        >
-                                            <Edit2 size={18} />
-                                        </button>
-                                        {!p.user_username && (
+                                    {canEdit && (
+                                        <td className="px-4 py-2 flex gap-2">
                                             <button
-                                                onClick={() => handleLinkUser(p.id)}
-                                                className="text-green-600 hover:text-green-800"
-                                                title="사용자 연결"
-                                                disabled={!selectedUser}
+                                                onClick={() => {
+                                                    setEditing(p);
+                                                    setIsNew(false);
+                                                }}
+                                                className="text-blue-600 hover:text-blue-800"
+                                                title="수정"
                                             >
-                                                <Plus size={18} />
+                                                <Edit2 size={18} />
                                             </button>
-                                        )}
-                                        <button
-                                            onClick={() => handleDelete(p.id)}
-                                            className="text-red-600 hover:text-red-800"
-                                            title="삭제"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </td>
-                                )}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                                            {!p.user_username && (
+                                                <button
+                                                    onClick={() => handleLinkUser(p.id)}
+                                                    className="text-green-600 hover:text-green-800"
+                                                    title="사용자 연결"
+                                                    disabled={!selectedUser}
+                                                >
+                                                    <Plus size={18} />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleDelete(p.id)}
+                                                className="text-red-600 hover:text-red-800"
+                                                title="삭제"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
 
             {/* ------------------------------------------------------------------ */}
@@ -951,7 +914,7 @@ export default function PlayerEditor() {
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
                                     능력치 (1-10)
                                 </label>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {[
                                         { key: 'shooting' as keyof Player, label: '슈팅', color: 'bg-red-50 border-red-100' },
                                         { key: 'offball_run' as keyof Player, label: '침투', color: 'bg-orange-50 border-orange-100' },
@@ -970,10 +933,10 @@ export default function PlayerEditor() {
                                                     {editing[stat.key] as number}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1">
                                                 <button
                                                     onClick={() => setEditing({ ...editing, [stat.key]: Math.max(1, (editing[stat.key] as number) - 1) })}
-                                                    className="flex-1 py-2 rounded-lg bg-white shadow-sm border border-slate-200 text-slate-500 font-bold text-lg hover:bg-slate-50 active:scale-95 transition-all"
+                                                    className="w-8 h-8 shrink-0 rounded-lg bg-white shadow-sm border border-slate-200 text-slate-500 font-bold hover:bg-slate-50 active:scale-95 transition-all"
                                                 >
                                                     -
                                                 </button>
@@ -983,11 +946,11 @@ export default function PlayerEditor() {
                                                     max="10"
                                                     value={editing[stat.key] as number}
                                                     onChange={(e) => setEditing({ ...editing, [stat.key]: parseInt(e.target.value) })}
-                                                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                    className="flex-1 min-w-0 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                                                 />
                                                 <button
                                                     onClick={() => setEditing({ ...editing, [stat.key]: Math.min(10, (editing[stat.key] as number) + 1) })}
-                                                    className="flex-1 py-2 rounded-lg bg-white shadow-sm border border-slate-200 text-blue-600 font-bold text-lg hover:bg-blue-50 active:scale-95 transition-all"
+                                                    className="w-8 h-8 shrink-0 rounded-lg bg-white shadow-sm border border-slate-200 text-blue-600 font-bold hover:bg-blue-50 active:scale-95 transition-all"
                                                 >
                                                     +
                                                 </button>

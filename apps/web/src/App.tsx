@@ -3,6 +3,7 @@ import MainLayout from '@/layouts/MainLayout'
 import Dashboard from '@/pages/Dashboard'
 import SessionList from '@/pages/sessions/SessionList'
 import SessionDetail from '@/pages/sessions/SessionDetail'
+import MatchRecordPage from '@/pages/sessions/MatchRecordPage'
 import SessionNew from '@/pages/admin/SessionNew'
 import PlayerEditor from '@/pages/admin/PlayerEditor'
 import LoginPage from '@/pages/login/LoginPage'
@@ -26,12 +27,13 @@ function App() {
                     <Route path="/signup" element={<SignupPage />} />
                     <Route path="/sessions" element={<SessionList />} />
                     <Route path="/sessions/:id" element={<SessionDetail />} />
+                    <Route path="/sessions/:id/match/:matchId/record" element={<MatchRecordPage />} />
                     <Route path="/rankings" element={<RankingsPage />} />
                     <Route path="/me" element={<MePage />} />
 
                     {/* Admin Routes */}
                     <Route path="/sessions/new" element={<AdminRoute><SessionNew /></AdminRoute>} />
-                    <Route path="/admin/players" element={<PlayerEditor />} />
+                    <Route path="/admin/players" element={<AdminRoute><PlayerEditor /></AdminRoute>} />
                 </Route>
             </Routes>
         </BrowserRouter>

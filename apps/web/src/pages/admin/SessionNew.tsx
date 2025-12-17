@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Save, RefreshCw, Wand2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +11,7 @@ interface ParsedResult {
 }
 
 export default function SessionNew() {
+    const navigate = useNavigate();
     const [text, setText] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<ParsedResult | null>(null);
@@ -31,9 +33,71 @@ export default function SessionNew() {
         }
     };
 
+    const handleRegister = async (name: string) => {
+        if (!confirm(`'${name}' 선수를 새로 등록하시겠습니까?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:8787/players', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ name })
+            });
+            const data = await res.json();
+
+            if (data.success || data.exists) {
+                // Determine ID (data.id)
+                const newPlayer = { id: data.id, name };
+
+                // Update State
+                if (result) {
+                    setResult({
+                        ...result,
+                        matched: [...result.matched, newPlayer],
+                        unknown: result.unknown.filter(u => u !== name),
+                        count: result.count // Count stays same, just identified
+                    });
+                }
+            } else {
+                alert('등록 실패: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Error: ' + e);
+        }
+    };
+
     const handleSave = async () => {
         if (!result) return;
-        alert('Saving is not implemented in this demo yet.');
+        if (!confirm(`${result.date} 일정을 생성하시겠습니까?\n참석자: ${result.matched.length}명`)) return;
+
+        setLoading(true);
+        try {
+            const res = await fetch('http://localhost:8787/sessions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: result.date,
+                    title: '정기 운동',
+                    pot_total: 0,
+                    base_fee: 0,
+                    player_ids: result.matched.map(p => p.id)
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                navigate(`/sessions/${data.id}`);
+            } else {
+                alert('세션 생성 실패');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('오류가 발생했습니다: ' + e);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -114,10 +178,15 @@ export default function SessionNew() {
                                             </span>
                                         ))}
                                         {result.unknown.map((name, i) => (
-                                            <span key={i} className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-100 rounded-lg text-sm font-bold flex items-center gap-1 animate-pulse">
+                                            <button
+                                                key={i}
+                                                onClick={() => handleRegister(name)}
+                                                className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-100 rounded-lg text-sm font-bold flex items-center gap-1 animate-pulse hover:bg-red-100 transition-colors"
+                                                title="클릭하여 선수 등록"
+                                            >
                                                 <AlertCircle size={12} />
                                                 {name}?
-                                            </span>
+                                            </button>
                                         ))}
                                     </div>
                                 </div>

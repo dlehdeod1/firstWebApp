@@ -98,10 +98,6 @@ export default function LoginPage() {
                         <a href="/signup" className="text-blue-600 font-bold text-sm hover:underline">회원가입</a>
                     </div>
                 </form>
-
-                <div className="mt-6 text-center text-sm text-slate-400">
-                    * 데모 계정: admin@wedfc.com / admin123
-                </div>
             </div>
         </div>
     )

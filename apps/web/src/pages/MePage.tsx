@@ -1,32 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Users, Save, LogOut, Trophy, Award } from 'lucide-react'
+import { User, Users, Save, LogOut, Trophy, Award, Heart, Info } from 'lucide-react'
+import { Tooltip } from '@/components/ui/Tooltip'
+
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
 
 interface Badge {
     code: string
     name: string
     description: string
-    awarded_at: number
-}
-
-interface Records {
-    wins: number
-    podiums: number
-    goals: number
-    assists: number
-    attendance: number
-    totalScore: number
-    matchesPlayed: number
-    attackPoints: number
-}
-
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
-
-interface Ability {
-    curr_attack: number
-    curr_playmaker: number
-    curr_competitiveness: number
-    curr_diligence: number
 }
 
 interface AbilityLog {
@@ -34,24 +16,150 @@ interface AbilityLog {
     stat_type: string
     delta: number
     reason: string
-    created_at: number
+    created_at: string
+}
+
+const TOOLTIPS: Record<string, string> = {
+    '득점력': '((득점x2 + 도움) / 경기수) * 20 (최대 100점)',
+    '기여도': '팀 승리와 공격포인트를 종합하여 산출된 기여도',
+    '승률': '승리 경기 수 / 전체 경기 수 (백분율)',
+    '참여도': '시즌 경기 참석 횟수 기반 (상대평가)'
 }
 
 interface UserProfile {
-    user: { email: string | null, username: string | null, role: string }
-    profile: {
-        alias: string | null
-        phone: string | null
-        birth_date: string | null // YYYY-MM-DD
-        age: number | null
-        height_cm: number | null
-        weight_kg: number | null
-    } | null
-    player: any
-    badges: Badge[]
-    records: Records
-    abilities?: Ability
+    user: {
+        id: number
+        username: string
+        role: string
+    }
+    profile?: {
+        alias: string
+        phone: string
+        birth_date: string
+        height_cm: number
+        weight_kg: number
+        age?: number
+    }
+    player?: {
+        id: number
+        player_code: string
+        link_status: 'PENDING' | 'ACTIVE' | 'REJECTED'
+    }
+    abilities?: {
+        curr_attack: number
+        curr_playmaker: number
+        curr_competitiveness: number
+        curr_diligence: number
+    }
+    records?: {
+        matchesPlayed: number
+        goals: number
+        assists: number
+        attackPoints: number
+        wins: number
+        attendance: number
+        totalScore: number
+        rank1?: number
+        rank2?: number
+        rank3?: number
+    }
+    badges?: Badge[]
     abilityHistory?: AbilityLog[]
+}
+function PreferenceSection() {
+    const [players, setPlayers] = useState<any[]>([])
+    const [preferences, setPreferences] = useState<{ targetId: number, rank: number }[]>([])
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        const token = localStorage.getItem('auth_token')
+        if (!token) return
+
+        // Fetch All Players
+        fetch('http://localhost:8787/players', { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(data => setPlayers(Array.isArray(data) ? data : []))
+
+        // Fetch My Preferences
+        fetch('http://localhost:8787/me/preferences', { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(data => {
+                if (data.preferences) setPreferences(data.preferences)
+            })
+            .finally(() => setLoading(false))
+    }, [])
+
+    const handleSelect = (rank: number, targetId: number) => {
+        setPreferences(prev => {
+            const filtered = prev.filter(p => p.rank !== rank) // Remove existing at this rank
+            if (targetId === -1) return filtered // Clear
+            return [...filtered, { rank, targetId }]
+        })
+    }
+
+    const handleSave = async () => {
+        const token = localStorage.getItem('auth_token')
+        setSaving(true)
+        try {
+            const res = await fetch('http://localhost:8787/me/preferences', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ preferences })
+            })
+            if (res.ok) alert('선호 멤버가 저장되었습니다.')
+            else alert('저장 실패')
+        } catch (e) {
+            alert('오류 발생')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    if (loading) return null
+
+    return (
+        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <Heart size={18} className="text-pink-500" />
+                선호 멤버 설정 (Chemistry)
+            </h2>
+            <p className="text-xs text-slate-500">
+                함께 뛰고 싶은 멤버를 선택하세요. 팀 구성 시 같은 팀이 될 확률이 높아집니다. (1지망일수록 강력하게 반영)
+            </p>
+
+            <div className="space-y-3">
+                {[1, 2, 3].map(rank => {
+                    const current = preferences.find(p => p.rank === rank)
+                    return (
+                        <div key={rank} className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${rank === 1 ? 'bg-pink-100 text-pink-600' : 'bg-slate-100 text-slate-500'}`}>
+                                {rank}
+                            </div>
+                            <select
+                                className="flex-1 p-2 bg-slate-50 rounded-xl border border-slate-200 text-sm font-medium outline-none"
+                                value={current?.targetId || -1}
+                                onChange={(e) => handleSelect(rank, Number(e.target.value))}
+                            >
+                                <option value={-1}>선택 안함</option>
+                                {players.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.player_code})</option>
+                                ))}
+                            </select>
+                        </div>
+                    )
+                })}
+            </div>
+
+            <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full py-3 mt-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 disabled:opacity-50"
+            >
+                {saving ? '저장 중...' : '선호도 저장'}
+            </button>
+        </div>
+    )
 }
 
 export default function MePage() {
@@ -154,10 +262,10 @@ export default function MePage() {
 
     // Chart Data
     const chartData = data?.abilities ? [
-        { subject: '공격력', A: data.abilities.curr_attack, fullMark: 100 },
-        { subject: '플레이메이커', A: data.abilities.curr_playmaker, fullMark: 100 },
-        { subject: '승부사', A: data.abilities.curr_competitiveness, fullMark: 100 },
-        { subject: '성실도', A: data.abilities.curr_diligence, fullMark: 100 },
+        { subject: '득점력', A: data.abilities.curr_attack, fullMark: 100 },
+        { subject: '기여도', A: data.abilities.curr_playmaker, fullMark: 100 },
+        { subject: '승률', A: data.abilities.curr_competitiveness, fullMark: 100 },
+        { subject: '참여도', A: data.abilities.curr_diligence, fullMark: 100 },
     ] : []
 
     return (
@@ -261,7 +369,7 @@ export default function MePage() {
                                 <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
                                     <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
                                         <Award size={18} className="text-purple-500" />
-                                        능력치 분석
+                                        시즌 활동 분석 (Performance)
                                     </h2>
                                     <div className="h-64 w-full -ml-4">
                                         <ResponsiveContainer width="100%" height="100%">
@@ -285,7 +393,12 @@ export default function MePage() {
                                     <div className="grid grid-cols-2 gap-3 mt-2">
                                         {chartData.map(stat => (
                                             <div key={stat.subject} className="bg-slate-50 p-3 rounded-lg flex justify-between items-center">
-                                                <span className="text-xs text-slate-500 font-bold">{stat.subject}</span>
+                                                <span className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                                                    {stat.subject}
+                                                    <Tooltip text={TOOLTIPS[stat.subject] || ''} align="left">
+                                                        <Info size={12} className="text-slate-300 hover:text-slate-500 transition-colors" />
+                                                    </Tooltip>
+                                                </span>
                                                 <span className="text-lg font-black text-slate-800">{Math.round(stat.A)}</span>
                                             </div>
                                         ))}
@@ -330,7 +443,25 @@ export default function MePage() {
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
                                             <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">공격P</div>
-                                            <div className="font-bold text-blue-600 text-lg">{data.records.attackPoints || 0}</div>
+                                            <div className="font-bold text-slate-900 text-lg">{data.records.attackPoints || 0}</div>
+                                        </div>
+                                        <div className="p-2 bg-slate-50 rounded-xl">
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">1등</div>
+                                            <div className="font-bold text-yellow-600 text-lg">{data.records.rank1 || 0}</div>
+                                        </div>
+                                        <div className="p-2 bg-slate-50 rounded-xl">
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">2등</div>
+                                            <div className="font-bold text-slate-600 text-lg">{data.records.rank2 || 0}</div>
+                                        </div>
+                                        <div className="p-2 bg-slate-50 rounded-xl">
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">3등</div>
+                                            <div className="font-bold text-orange-600 text-lg">{data.records.rank3 || 0}</div>
+                                        </div>
+                                        <div className="p-2 bg-slate-50 rounded-xl">
+                                            <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">승률</div>
+                                            <div className="font-bold text-slate-900 text-lg">
+                                                {data.records.matchesPlayed ? Math.round((data.records.wins / data.records.matchesPlayed) * 100) : 0}%
+                                            </div>
                                         </div>
                                         <div className="p-2 bg-slate-50 rounded-xl">
                                             <div className="text-xs text-slate-500 mb-1 whitespace-nowrap">골</div>
@@ -379,6 +510,10 @@ export default function MePage() {
                         </>
                     )
                 })()}
+
+
+
+
 
                 <form onSubmit={handleSave} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
                     <h2 className="font-bold text-slate-800 flex items-center gap-2">
@@ -440,6 +575,9 @@ export default function MePage() {
                     </div>
                 </form>
 
+                {/* Preferences Section */}
+                <PreferenceSection />
+
                 <div className="pt-4 flex items-center justify-between">
                     <button
                         onClick={handleLogout}
@@ -458,7 +596,7 @@ export default function MePage() {
                     </button>
                 </div>
 
-            </div>
+            </div >
         </div >
     )
 }

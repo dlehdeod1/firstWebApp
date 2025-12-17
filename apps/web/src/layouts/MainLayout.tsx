@@ -40,11 +40,14 @@ export default function MainLayout() {
                 <div className="max-w-7xl mx-auto px-4 md:px-6">
                     <div className="flex items-center justify-between">
                         {/* Logo */}
-                        <Link to="/" className="flex items-center gap-2 group">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg group-hover:shadow-blue-500/30 transition-shadow">
-                                <span className="font-bold text-lg">W</span>
-                            </div>
-                            <span className="font-bold text-xl tracking-tight text-slate-800">Wednesday FC</span>
+                        <Link to="/" className="flex items-center gap-1.5 group">
+                            <span className="text-xl font-black tracking-tight">
+                                <span className="text-emerald-600">Corner</span>
+                                <span className="text-amber-500">K</span>
+                                <span className="text-blue-500">i</span>
+                                <span className="text-emerald-600">cks</span>
+                            </span>
+                            <span className="text-lg">⚽</span>
                         </Link>
 
                         {/* Desktop Menu */}
@@ -137,7 +140,7 @@ export default function MainLayout() {
             {/* Footer */}
             <footer className="bg-white border-t border-slate-100 py-8 mt-auto">
                 <div className="max-w-7xl mx-auto px-4 text-center">
-                    <p className="text-slate-400 text-sm mb-4">© 2025 Wednesday Futsal Club</p>
+                    <p className="text-slate-400 text-sm mb-4">© 2025 Corner Kicks ⚽</p>
                     {localStorage.getItem('auth_token') ? (
                         <button
                             onClick={() => {

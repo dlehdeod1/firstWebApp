@@ -164,7 +164,7 @@ matches.delete('/:id', async (c) => {
     return c.json({ success: true })
 })
 
-// RECORD EVENT (Goal/Assist)
+// RECORD EVENT (Goal/Assist/Defense)
 matches.post('/:id/events', async (c) => {
     const matchId = c.req.param('id')
     const { type, scorerId, assisterId, teamId } = await c.req.json()
@@ -175,6 +175,14 @@ matches.post('/:id/events', async (c) => {
     const nAssisterId = assisterId ? Number(assisterId) : null
 
     try {
+        if (type === 'DEFENSE') {
+            // Defense event - just log it for now (no DB change needed)
+            // TODO: Add good_defense column to player_match_stats if you want to track this
+            // For now, just return success without DB write
+            return c.json({ success: true, type: 'DEFENSE', playerId: nScorerId })
+        }
+
+        // GOAL event
         await c.env.DB.batch([
             // 1. Update Match Score
             c.env.DB.prepare(`

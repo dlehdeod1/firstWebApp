@@ -319,17 +319,15 @@ export class AbilityService {
             finalStats[up.stat] = currentVal
         }
 
-        // Player Update
+        // Player Update - only update columns that exist in schema
         batch.push(DB.prepare(`
             UPDATE players SET 
-                shooting = ?, passing = ?, stamina = ?, defense = ?, sense = ?, updated_at = unixepoch()
+                shooting = ?, passing = ?, stamina = ?, updated_at = unixepoch()
             WHERE id = ?
         `).bind(
             finalStats.shooting,
             finalStats.passing,
             finalStats.stamina,
-            finalStats.defense || 50,
-            finalStats.sense || 50,
             playerId
         ))
 

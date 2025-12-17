@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { MapPin, Users, ClipboardList, Shield, Activity, Lock, Wand2, RefreshCw, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import html2canvas from 'html2canvas'
@@ -39,20 +39,90 @@ function TabOverview({ players, status }: { players: any[], status: string }) {
     )
 }
 
-function TabTeams({ teams, players, onAssign, isAdmin }: { teams: any[], players: any[], onAssign: (pid: number, tid: number | null) => void, isAdmin: boolean }) {
+function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: any[], players: any[], onAssign: (pid: number, tid: number | null) => void, isAdmin: boolean, preferences?: any[] }) {
     // 1. Find Unassigned Players
-    // Get all player IDs in teams
     const assignedIds = new Set<number>()
     teams.forEach(t => t.players?.forEach((p: any) => assignedIds.add(p.id)))
-
-    // Filter players who are present (in session.players) but not in any team
     const unassigned = players.filter(p => !assignedIds.has(p.id))
 
     const colors = [
-        { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-900', badge: 'bg-red-500' },
-        { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-900', badge: 'bg-blue-500' },
-        { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-900', badge: 'bg-emerald-500' }
+        { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-900', badge: 'bg-red-500', bar: 'bg-red-400' },
+        { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-900', badge: 'bg-blue-500', bar: 'bg-blue-400' },
+        { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-900', badge: 'bg-emerald-500', bar: 'bg-emerald-400' }
     ]
+
+    // Helper to calc stats
+    const getTeamStats = (players: any[]) => {
+        let atk = 0, mid = 0, def = 0, phys = 0
+        if (!players || players.length === 0) return { atk, mid, def, phys, total: 0 }
+
+        players.forEach(p => {
+            atk += (p.shooting || 50) + (p.offball_run || 50)
+            mid += (p.passing || 50) + (p.ball_keeping || 50)
+            def += (p.intercept || 50) + (p.marking || 50)
+            phys += (p.stamina || 50) + (p.speed || 50) + (p.physical || 50)
+        })
+
+        return { atk, mid, def, phys, total: atk + mid + def + phys }
+    }
+
+    // Get AI analysis from team's saved score_stats
+    const getTeamAiInfo = (team: any) => {
+        if (!team.score_stats) return null
+        try {
+            return typeof team.score_stats === 'string' ? JSON.parse(team.score_stats) : team.score_stats
+        } catch {
+            return null
+        }
+    }
+
+    // Team Characteristic Analysis
+    const getTeamCharacter = (stats: { atk: number, mid: number, def: number, phys: number }) => {
+        const { atk, mid, def, phys } = stats
+        if (atk === 0 && mid === 0 && def === 0) return { type: '분석 불가', emoji: '❓', strategy: '선수를 배정해주세요', color: 'text-slate-400' }
+
+        const avg = (atk + mid + def) / 3
+        const atkRatio = atk / avg
+        const defRatio = def / avg
+        const midRatio = mid / avg
+
+        // Determine team type based on stat distribution
+        if (atkRatio > 1.15 && defRatio < 0.9) {
+            return {
+                type: '공격형',
+                emoji: '⚔️',
+                strategy: '적극적인 압박과 빠른 역습을 노리세요',
+                color: 'text-red-600'
+            }
+        } else if (defRatio > 1.15 && atkRatio < 0.9) {
+            return {
+                type: '수비형',
+                emoji: '🛡️',
+                strategy: '견고한 수비 후 카운터 어택을 노리세요',
+                color: 'text-blue-600'
+            }
+        } else if (midRatio > 1.1) {
+            return {
+                type: '점유형',
+                emoji: '🎯',
+                strategy: '볼 점유를 높이고 패스로 공간을 만드세요',
+                color: 'text-purple-600'
+            }
+        } else if (phys > (atk + mid + def) * 0.35) {
+            return {
+                type: '체력형',
+                emoji: '💪',
+                strategy: '후반 체력 우위로 승부하세요',
+                color: 'text-amber-600'
+            }
+        }
+        return {
+            type: '밸런스형',
+            emoji: '⚖️',
+            strategy: '상황에 맞게 유연하게 대응하세요',
+            color: 'text-emerald-600'
+        }
+    }
 
     return (
         <div id="capture-area-teams" className="space-y-6">
@@ -90,24 +160,107 @@ function TabTeams({ teams, players, onAssign, isAdmin }: { teams: any[], players
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {teams.map((team, idx) => {
                     const style = colors[idx % colors.length]
+                    const stats = getTeamStats(team.players)
+                    const maxStat = Math.max(stats.atk, stats.mid, stats.def, stats.phys, 1)
+                    const ruleBasedChar = getTeamCharacter(stats)
+                    const aiInfo = getTeamAiInfo(team)
+
+                    // Use AI info if available, otherwise fallback to rule-based
+                    const displayInfo = aiInfo ? {
+                        type: aiInfo.type,
+                        emoji: aiInfo.emoji,
+                        strategy: aiInfo.strategy,
+                        color: 'text-purple-600',
+                        keyPlayer: aiInfo.keyPlayer,
+                        keyPlayerReason: aiInfo.keyPlayerReason
+                    } : ruleBasedChar
+
                     return (
-                        <div key={team.id} className={cn("p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md", style.bg, style.border)}>
-                            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/50">
+                        <div key={team.id} className={cn("p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md flex flex-col h-full", style.bg, style.border)}>
+                            <div className="flex items-center gap-3 mb-3">
                                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-md", style.badge)}>
                                     {team.name?.[0]}
                                 </div>
-                                <h3 className={cn("font-bold text-lg truncate", style.text)}>{team.name}</h3>
-                                <div className="ml-auto bg-white/50 px-2 py-0.5 rounded text-xs font-bold opacity-70">
-                                    {team.players?.length || 0}명
+                                <div className="flex-1 min-w-0">
+                                    <h3 className={cn("font-bold text-lg truncate", style.text)}>{team.name}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn("text-xs font-bold", displayInfo.color)}>
+                                            {displayInfo.emoji} {displayInfo.type}
+                                            {aiInfo && <span className="ml-1 text-[9px] bg-purple-100 text-purple-600 px-1 rounded">AI</span>}
+                                        </span>
+                                        <span className="text-xs text-slate-400">• {team.players?.length || 0}명</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+
+                            {/* Strategy Tip */}
+                            {team.players?.length > 0 && (
+                                <div className={cn("mb-3 p-2 rounded-lg border", aiInfo ? "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-100" : "bg-white/60 border-white/80")}>
+                                    <div className="text-[10px] text-slate-500 font-medium">{aiInfo ? '🤖 AI 전략' : '💡 전략 팁'}</div>
+                                    <div className="text-xs text-slate-700 font-medium">{displayInfo.strategy}</div>
+                                    {aiInfo?.keyPlayer && (
+                                        <div className="mt-1 text-[10px] text-purple-600">
+                                            ⭐ 핵심: <span className="font-bold">{aiInfo.keyPlayer}</span> - {aiInfo.keyPlayerReason}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Balance Indicators */}
+                            <div className="mb-4 space-y-2 bg-white/40 p-3 rounded-xl">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                                    <span className="w-8">공격</span>
+                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${(stats.atk / (maxStat * 1.2)) * 100}%` }}></div>
+                                    </div>
+                                    <span className="w-6 text-right">{stats.atk}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                                    <span className="w-8">미드</span>
+                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${(stats.mid / (maxStat * 1.2)) * 100}%` }}></div>
+                                    </div>
+                                    <span className="w-6 text-right">{stats.mid}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                                    <span className="w-8">수비</span>
+                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${(stats.def / (maxStat * 1.2)) * 100}%` }}></div>
+                                    </div>
+                                    <span className="w-6 text-right">{stats.def}</span>
+                                </div>
+                                <div className="pt-1 mt-1 border-t border-white/50 flex justify-between text-xs font-bold text-slate-500">
+                                    <span>밸런스 점수</span>
+                                    <span>{stats.total}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 flex-1">
                                 {team.players && team.players.length > 0 ? (
                                     team.players.map((m: any) => (
                                         <div key={m.id} className="flex items-center justify-between p-2 rounded-lg bg-white/60 hover:bg-white/80 transition-colors group">
                                             <div className="flex items-center gap-2">
                                                 <div className={cn("w-1.5 h-1.5 rounded-full", style.badge)}></div>
-                                                <span className="text-sm font-medium text-slate-700">{m.name}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium text-slate-700">{m.name}</span>
+                                                    {/* Admin View: Chemistry Preferences */}
+                                                    {isAdmin && (
+                                                        <div className="flex gap-1 text-[10px] text-slate-400">
+                                                            {(() => {
+                                                                // Find prefs for this player (m.id)
+                                                                // Assumes preferences prop is passed to TabTeams (which I need to update in parent too)
+                                                                // Wait, I can't easily access 'preferences' here without passing it down.
+                                                                // I'll add a 'data-prefs' attribute or just render if I have the data.
+                                                                // Let's assume 'preferences' is passed in props.
+                                                                return preferences?.filter((p: any) => p.player_id === m.id).map((p: any) => (
+                                                                    <span key={p.rank} className={cn("px-1 rounded bg-slate-100", p.rank === 1 && "text-pink-600 bg-pink-50 font-bold")}>
+                                                                        {p.rank}:{p.target_name}
+                                                                    </span>
+                                                                ))
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                             {isAdmin && (
                                                 <select
@@ -139,7 +292,7 @@ function TabTeams({ teams, players, onAssign, isAdmin }: { teams: any[], players
     )
 }
 
-function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRecordEvent, onAddMatch, onDeleteMatch, onClearMatches, onRegenMatches, onAutoFillMatches }: {
+function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRecordEvent, onAddMatch, onDeleteMatch, onClearMatches, onRegenMatches, onAutoFillMatches, sessionId }: {
     matches: any[],
     teams: any[],
     onUpdateMatch: (id: number, data: any) => void,
@@ -150,7 +303,8 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
     onDeleteMatch: (id: number) => void,
     onClearMatches: () => void,
     onRegenMatches: () => void,
-    onAutoFillMatches: () => void
+    onAutoFillMatches: () => void,
+    sessionId: string | undefined
 }) {
     // Goal Modal State
     const [goalModal, setGoalModal] = useState<{ matchId: number, teamId: number } | null>(null)
@@ -241,18 +395,18 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
                         <Activity size={18} /> 매치 일정
                     </h3>
                     {isAdmin && (
-                        <div className="flex gap-2 text-xs">
-                            <button onClick={onRegenMatches} className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-bold whitespace-nowrap">
-                                ↻ 9경기 재생성
+                        <div className="flex flex-wrap gap-2 text-xs">
+                            <button onClick={onRegenMatches} className="px-2 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-bold whitespace-nowrap text-[11px]">
+                                ↻ 재생성
                             </button>
-                            <button onClick={onAutoFillMatches} className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-bold whitespace-nowrap">
-                                + 로테이션 채움
+                            <button onClick={onAutoFillMatches} className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-bold whitespace-nowrap text-[11px]">
+                                + 로테이션
                             </button>
-                            <button onClick={onClearMatches} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold whitespace-nowrap">
-                                전체 삭제
+                            <button onClick={onClearMatches} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold whitespace-nowrap text-[11px]">
+                                삭제
                             </button>
-                            <button onClick={onAddMatch} className="px-3 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-bold whitespace-nowrap">
-                                + 경기 추가
+                            <button onClick={onAddMatch} className="px-2 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-bold whitespace-nowrap text-[11px]">
+                                + 추가
                             </button>
                         </div>
                     )}
@@ -260,83 +414,56 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
 
                 {matches.length === 0 && <p className="text-slate-400 text-center py-10">일정이 없습니다.</p>}
 
-                <div className="grid gap-3">
+                <div className="grid gap-3 overflow-hidden">
                     {matches.map(m => {
                         const t1 = teams.find(t => t.id === m.team1_id)
                         const t2 = teams.find(t => t.id === m.team2_id)
                         return (
-                            <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm relative group">
-                                <div className="font-bold text-slate-300 w-8 text-xs">#{m.match_no}</div>
-                                <div className="flex-1 flex items-center justify-center gap-2 md:gap-4">
+                            <div key={m.id} className="bg-white p-3 md:p-4 rounded-xl border border-slate-200 flex items-center shadow-sm relative group overflow-hidden">
+                                <div className="font-bold text-slate-300 w-6 md:w-8 text-xs shrink-0">#{m.match_no}</div>
+                                <div className="flex-1 flex items-center justify-center gap-1 md:gap-4 min-w-0">
 
                                     {/* Team 1 */}
                                     {isAdmin ? (
                                         <select
                                             value={m.team1_id}
                                             onChange={(e) => onUpdateMatch(m.id, { team1_id: Number(e.target.value) })}
-                                            className="w-20 md:w-32 text-right text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
+                                            className="flex-1 min-w-0 text-right text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
                                         >
                                             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                         </select>
                                     ) : (
-                                        <span className="font-bold text-slate-800 w-24 md:w-32 text-right truncate text-sm">{t1?.name}</span>
+                                        <span className="flex-1 min-w-0 font-bold text-slate-800 text-right truncate text-sm">{t1?.name}</span>
                                     )}
 
-                                    <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 shadow-inner">
-                                        {/* Team 1 Controls */}
-                                        <div className="flex items-center gap-1">
-                                            {canRecord && (
-                                                <>
-                                                    <button onClick={() => setGoalModal({ matchId: m.id, teamId: m.team1_id })} className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white rounded-full text-xs transition-colors" title="골/어시스트 기록">
-                                                        ⚽
-                                                    </button>
-                                                    <button onClick={() => onUpdateMatch(m.id, { team1_score: Math.max(0, m.team1_score - 1) })} className="w-5 h-5 flex items-center justify-center bg-slate-200 text-slate-500 hover:bg-slate-300 rounded text-xs">
-                                                        -
-                                                    </button>
-                                                </>
-                                            )}
-                                            <span className="w-6 text-center font-black text-xl text-slate-900">{m.team1_score}</span>
-                                            {canRecord && (
-                                                <button onClick={() => onUpdateMatch(m.id, { team1_score: m.team1_score + 1 })} className="w-5 h-5 flex items-center justify-center bg-slate-200 text-slate-500 hover:bg-slate-300 rounded text-xs">
-                                                    +
-                                                </button>
-                                            )}
+                                    {canRecord ? (
+                                        <Link
+                                            to={`/sessions/${sessionId}/match/${m.id}/record`}
+                                            className="flex-shrink-0 flex items-center gap-2 bg-slate-50 hover:bg-emerald-50 px-3 py-2 rounded-xl border border-slate-100 hover:border-emerald-200 shadow-inner transition-colors cursor-pointer"
+                                        >
+                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team1_score}</span>
+                                            <span className="text-slate-300 font-bold text-sm">:</span>
+                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team2_score}</span>
+                                        </Link>
+                                    ) : (
+                                        <div className="flex-shrink-0 flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 shadow-inner">
+                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team1_score}</span>
+                                            <span className="text-slate-300 font-bold text-sm">:</span>
+                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team2_score}</span>
                                         </div>
-
-                                        <span className="text-slate-300 font-bold">:</span>
-
-                                        {/* Team 2 Controls */}
-                                        <div className="flex items-center gap-1">
-                                            {canRecord && (
-                                                <button onClick={() => onUpdateMatch(m.id, { team2_score: m.team2_score + 1 })} className="w-5 h-5 flex items-center justify-center bg-slate-200 text-slate-500 hover:bg-slate-300 rounded text-xs">
-                                                    +
-                                                </button>
-                                            )}
-                                            <span className="w-6 text-center font-black text-xl text-slate-900">{m.team2_score}</span>
-                                            {canRecord && (
-                                                <>
-                                                    <button onClick={() => onUpdateMatch(m.id, { team2_score: Math.max(0, m.team2_score - 1) })} className="w-5 h-5 flex items-center justify-center bg-slate-200 text-slate-500 hover:bg-slate-300 rounded text-xs">
-                                                        -
-                                                    </button>
-                                                    <button onClick={() => setGoalModal({ matchId: m.id, teamId: m.team2_id })} className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white rounded-full text-xs transition-colors" title="골/어시스트 기록">
-                                                        ⚽
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
+                                    )}
 
                                     {/* Team 2 */}
                                     {isAdmin ? (
                                         <select
                                             value={m.team2_id}
                                             onChange={(e) => onUpdateMatch(m.id, { team2_id: Number(e.target.value) })}
-                                            className="w-20 md:w-32 text-left text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
+                                            className="flex-1 min-w-0 text-left text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
                                         >
                                             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                         </select>
                                     ) : (
-                                        <span className="font-bold text-slate-800 w-24 md:w-32 text-left truncate text-sm">{t2?.name}</span>
+                                        <span className="flex-1 min-w-0 font-bold text-slate-800 text-left truncate text-sm">{t2?.name}</span>
                                     )}
                                 </div>
                                 {isAdmin && (
@@ -390,6 +517,23 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
             )}
         </div>
     )
+}
+
+// Helper for Season Title
+function getSeasonTitle(dateStr: string) {
+    if (!dateStr) return '정기 풋살'
+    const date = new Date(dateStr)
+    const year = date.getFullYear()
+    const firstJan = new Date(year, 0, 1)
+    const day = firstJan.getDay()
+    const diff = (3 - day + 7) % 7
+    const firstWed = new Date(year, 0, 1 + diff)
+
+    const msDiff = date.getTime() - firstWed.getTime()
+    if (msDiff < 0) return `${year} 프리시즌`
+
+    const weekNum = Math.floor(msDiff / (7 * 24 * 60 * 60 * 1000)) + 1
+    return `${year}시즌 ${weekNum}경기`
 }
 
 export default function SessionDetail() {
@@ -460,10 +604,14 @@ export default function SessionDetail() {
 
         if (parseResult.unknown.length > 0) {
             try {
+                const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
                 const newIds = await Promise.all(parseResult.unknown.map(async (name) => {
                     const res = await fetch(`${API_URL}/players`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
                         body: JSON.stringify({ name })
                     })
                     const data = await res.json()
@@ -476,9 +624,13 @@ export default function SessionDetail() {
             }
         }
 
+        const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
         await fetch(`${API_URL}/sessions/${id}/attendance`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({ player_ids: playerIds })
         })
         alert('저장되었습니다.')
@@ -491,9 +643,13 @@ export default function SessionDetail() {
         if (newStatus === 'closed' && !confirm('마감 처리 하시겠습니까? 더 이상 참석자를 수정할 수 없게 됩니다.')) return
         if (newStatus === 'recruiting' && !confirm('마감을 취소하고 다시 모집 중으로 변경하시겠습니까?')) return
 
+        const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
         await fetch(`${API_URL}/sessions/${id}/status`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({ status: newStatus })
         })
         refreshSession()
@@ -505,17 +661,34 @@ export default function SessionDetail() {
     const handleGenerateTeams = async () => {
         if (!confirm('기존 팀 구성이 모두 초기화되고 새로 생성됩니다. 계속하시겠습니까? (덮어쓰기)')) return
         try {
+            const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
             const res = await fetch(`${API_URL}/sessions/${id}/teams/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ numTeams: 3 })
             })
-            if (res.ok) {
-                // Refresh
+            const data = await res.json()
+            if (res.ok && data.success) {
+                // Show balance info
+                const score = Math.round(data.balanceScore || 0)
+                const msg = `✅ 팀 생성 완료!\n\n밸런스 점수: ${score}점\n\n` +
+                    `📋 생성 요약:\n` +
+                    `- ${data.teams?.length || 0}개 팀 구성\n` +
+                    `- ${data.match_count || 0}경기 생성\n` +
+                    (score >= 80 ? '⭐ 아주 균형잡힌 팀 구성입니다!' :
+                        score >= 60 ? '👍 적절한 밸런스입니다.' :
+                            '⚠️ 선수 능력치 편차가 있습니다.')
+                alert(msg)
                 window.location.reload()
+            } else {
+                alert('팀 생성 실패: ' + (data.error || '알 수 없는 오류'))
             }
         } catch (error) {
             console.error(error)
+            alert('팀 생성 중 오류가 발생했습니다.')
         }
     }
 
@@ -605,16 +778,42 @@ export default function SessionDetail() {
         if (!element) return
 
         try {
-            const canvas = await html2canvas(element, { useCORS: true, backgroundColor: '#ffffff', scale: 2 })
+            // Add a temporary 'export-mode' class to style specifically for export if needed
+            element.classList.add('p-4', 'bg-white')
+
+            const canvas = await html2canvas(element, {
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                scale: 2,
+                logging: false,
+            })
+
+            element.classList.remove('p-4', 'bg-white')
+
             const link = document.createElement('a')
             link.href = canvas.toDataURL('image/png')
-            link.download = `wed_futsal_${session.session_date}_${activeTab}.png`
+            const dateStr = session.session_date.replace(/-/g, '')
+            link.download = `ConerKicks_${dateStr}_${activeTab}.png`
             link.click()
         } catch (e) {
             console.error('Capture failed', e)
             alert('이미지 저장에 실패했습니다.')
         }
     }
+
+    const [preferences, setPreferences] = useState<any[]>([])
+
+    useEffect(() => {
+        if (isAdmin) {
+            const token = localStorage.getItem('auth_token')
+            fetch(`${API_URL}/players/preferences`, { headers: { 'Authorization': `Bearer ${token}` } })
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) setPreferences(data)
+                })
+                .catch(err => console.error(err))
+        }
+    }, [isAdmin])
 
     if (error) return (
         <div className="p-20 text-center">
@@ -658,7 +857,7 @@ export default function SessionDetail() {
                     </span>
                 </div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h1 className="text-3xl font-extrabold text-slate-900">{session.title || '정기 풋살'}</h1>
+                    <h1 className="text-3xl font-extrabold text-slate-900">{getSeasonTitle(session.session_date)}</h1>
                     <div className="flex items-center gap-4 text-slate-500 text-sm font-medium">
                         <span className="flex items-center gap-1"><MapPin size={16} /> 경북대 A구장</span>
                     </div>
@@ -788,10 +987,11 @@ export default function SessionDetail() {
                 {activeTab === 'overview' && <TabOverview players={session.players || []} status={session.status} />}
                 {activeTab === 'teams' && (
                     <TabTeams
-                        teams={session.teams || []}
-                        players={session.players || []}
+                        teams={session.teams}
+                        players={session.players}
                         onAssign={handleAssignPlayer}
                         isAdmin={isAdmin}
+                        preferences={preferences}
                     />
                 )}
                 {activeTab === 'scoreboard' && (
@@ -807,6 +1007,7 @@ export default function SessionDetail() {
                         onClearMatches={handleClearMatches}
                         onRegenMatches={handleRegenMatches}
                         onAutoFillMatches={handleAutoFillMatches}
+                        sessionId={id}
                     />
                 )}
             </div>
