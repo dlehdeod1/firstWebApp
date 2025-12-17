@@ -1,0 +1,19 @@
+{
+    "name": "conerkicks",
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+        "dev:api": "npm run dev --workspace=apps/api",
+        "dev:web": "npm run dev --workspace=apps/web",
+        "deploy:api": "npm run deploy --workspace=apps/api",
+        "deploy:web": "npm run deploy --workspace=apps/web"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1",
+        "wrangler": "^4.54.0"
+    }
+}

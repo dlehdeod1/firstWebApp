@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx wrangler d1 execute:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
