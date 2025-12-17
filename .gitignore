@@ -1,4 +1,4 @@
-node_modules
+node_modules/
 
 .dev.vars
 .wrangler/
@@ -6,5 +6,5 @@ node_modules
 .env.*
 
 
-node_modules/
+**node_modules/
 
