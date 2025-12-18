@@ -24,7 +24,43 @@ export class AbilityService {
     }
 
     static async getStats(DB: D1Database, userId: string) {
-        return await DB.prepare('SELECT * FROM abilities WHERE user_id = ?').bind(userId).first()
+        const stats = await DB.prepare('SELECT * FROM abilities WHERE user_id = ?').bind(userId).first<any>()
+
+        if (stats) {
+            // Check if stats need yearly reset (Jan 1st reset)
+            const updatedAt = new Date(stats.updated_at * 1000)
+            const currentYear = new Date().getFullYear()
+            const statsYear = updatedAt.getFullYear()
+
+            if (statsYear < currentYear) {
+                // Reset to 20 for new season
+                const SEASON_START = 20
+                await DB.prepare(`
+                    UPDATE abilities SET
+                        curr_attack = ?,
+                        curr_playmaker = ?,
+                        curr_competitiveness = ?,
+                        curr_diligence = ?,
+                        updated_at = unixepoch()
+                    WHERE user_id = ?
+                `).bind(SEASON_START, SEASON_START, SEASON_START, SEASON_START, userId).run()
+
+                // Clear old ability logs for new season
+                await DB.prepare('DELETE FROM ability_logs WHERE user_id = ? AND created_at < ?')
+                    .bind(userId, Math.floor(new Date(currentYear, 0, 1).getTime() / 1000)).run()
+
+                // Return reset stats
+                return {
+                    ...stats,
+                    curr_attack: SEASON_START,
+                    curr_playmaker: SEASON_START,
+                    curr_competitiveness: SEASON_START,
+                    curr_diligence: SEASON_START,
+                }
+            }
+        }
+
+        return stats
     }
 
     static async getHistory(DB: D1Database, userId: string) {
@@ -155,8 +191,8 @@ export class AbilityService {
             dComp += 0.3
             logs.push({ type: 'COMPETITIVE', delta: 0.3, reason: 'Rank 2' })
         } else if (sessionStats.rank === 3) {
-            dComp += 0.1
-            logs.push({ type: 'COMPETITIVE', delta: 0.1, reason: 'Rank 3' })
+            dComp -= 0.7
+            logs.push({ type: 'COMPETITIVE', delta: -0.7, reason: 'Rank 3 (꼴찌)' })
         }
 
         // 4. Diligence (Attendance)

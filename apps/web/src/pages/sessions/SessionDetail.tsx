@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { MapPin, Users, ClipboardList, Shield, Activity, Lock, Wand2, RefreshCw, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import html2canvas from 'html2canvas'
 
 // Define API Base URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+
 function TabOverview({ players, status }: { players: any[], status: string }) {
     return (
         <div id="capture-area-overview" className="space-y-6 bg-white p-4 rounded-xl">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                    <Users className="text-blue-600" size={20} /> 참석??명단 ({players.length}�?
+                    <Users className="text-blue-600" size={20} /> 참석자 명단 ({players.length}명)
                 </h3>
                 {players.length === 0 ? (
-                    <p className="text-slate-400 text-sm">참석?��? ?�직 ?�습?�다. 관리자가 명단???�데?�트???�까지 기다?�주?�요.</p>
+                    <p className="text-slate-400 text-sm">참석자가 아직 없습니다. 관리자가 명단을 업데이트할 때까지 기다려주세요.</p>
                 ) : (
                     <div className="flex flex-wrap gap-2">
                         {players.map((p, i) => (
@@ -26,21 +28,60 @@ function TabOverview({ players, status }: { players: any[], status: string }) {
             </div>
 
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-                <h3 className="font-bold text-blue-900 mb-2">?�태: {status === 'recruiting' ? '모집 �? : status === 'closed' ? '마감?? : '종료??}</h3>
+                <h3 className="font-bold text-blue-900 mb-2">상태: {status === 'recruiting' ? '모집 중' : status === 'closed' ? '마감됨' : '종료됨'}</h3>
                 <p className="text-blue-700 text-sm leading-relaxed">
                     {status === 'recruiting'
-                        ? '?�재 참석?��? ?�악 중입?�다. ?�표가 마감?�면 ?� 구성???�작?�니??'
-                        : '참석 ?�인???�료?�었?�니?? ?� 구성???�인?�주?�요.'}
+                        ? '현재 참석자를 파악 중입니다. 투표가 마감되면 팀 구성이 시작됩니다.'
+                        : '참석 확인이 완료되었습니다. 팀 구성을 확인해주세요.'}
                 </p>
             </div>
         </div>
     )
 }
 
-function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: any[], players: any[], onAssign: (pid: number, tid: number | null) => void, isAdmin: boolean, preferences?: any[] }) {
+// Calculate team power analysis
+function calculateTeamPower(teamPlayers: any[]) {
+    if (!teamPlayers || teamPlayers.length === 0) return null
+
+    const stats = {
+        attack: 0,    // shooting + offball_run
+        defense: 0,   // intercept + marking
+        midfield: 0,  // passing + ball_keeping
+        physical: 0,  // stamina + speed + physical
+        overall: 0
+    }
+
+    let validPlayers = 0
+    teamPlayers.forEach((p: any) => {
+        // Check if player has stats
+        if (p.shooting !== undefined) {
+            stats.attack += (p.shooting || 5) + (p.offball_run || 5)
+            stats.defense += (p.intercept || 5) + (p.marking || 5)
+            stats.midfield += (p.passing || 5) + (p.ball_keeping || 5)
+            stats.physical += (p.stamina || 5) + (p.speed || 5) + (p.physical || 5)
+            validPlayers++
+        }
+    })
+
+    if (validPlayers === 0) return null
+
+    // Average per player, then scale to 100
+    stats.attack = Math.round((stats.attack / validPlayers / 20) * 100)
+    stats.defense = Math.round((stats.defense / validPlayers / 20) * 100)
+    stats.midfield = Math.round((stats.midfield / validPlayers / 20) * 100)
+    stats.physical = Math.round((stats.physical / validPlayers / 30) * 100)
+    stats.overall = Math.round((stats.attack + stats.defense + stats.midfield + stats.physical) / 4)
+
+    return stats
+}
+
+function TabTeams({ teams, players, onAssign, isAdmin, sessionId: _sessionId }: { teams: any[], players: any[], onAssign: (pid: number, tid: number | null) => void, isAdmin: boolean, sessionId: string }) {
     // 1. Find Unassigned Players
+    // Get all player IDs in teams
     const assignedIds = new Set<number>()
     teams.forEach(t => t.players?.forEach((p: any) => assignedIds.add(p.id)))
+
+    // Filter players who are present (in session.players) but not in any team
     const unassigned = players.filter(p => !assignedIds.has(p.id))
 
     const colors = [
@@ -49,76 +90,15 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
         { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-900', badge: 'bg-emerald-500', bar: 'bg-emerald-400' }
     ]
 
-    // Helper to calc stats
-    const getTeamStats = (players: any[]) => {
-        let atk = 0, mid = 0, def = 0, phys = 0
-        if (!players || players.length === 0) return { atk, mid, def, phys, total: 0 }
-
-        players.forEach(p => {
-            atk += (p.shooting || 50) + (p.offball_run || 50)
-            mid += (p.passing || 50) + (p.ball_keeping || 50)
-            def += (p.intercept || 50) + (p.marking || 50)
-            phys += (p.stamina || 50) + (p.speed || 50) + (p.physical || 50)
-        })
-
-        return { atk, mid, def, phys, total: atk + mid + def + phys }
-    }
-
-    // Get AI analysis from team's saved score_stats
-    const getTeamAiInfo = (team: any) => {
+    // Get AI analysis from team's stored score_stats (saved during team generation)
+    const getTeamAi = (team: any) => {
         if (!team.score_stats) return null
         try {
-            return typeof team.score_stats === 'string' ? JSON.parse(team.score_stats) : team.score_stats
+            return typeof team.score_stats === 'string'
+                ? JSON.parse(team.score_stats)
+                : team.score_stats
         } catch {
             return null
-        }
-    }
-
-    // Team Characteristic Analysis
-    const getTeamCharacter = (stats: { atk: number, mid: number, def: number, phys: number }) => {
-        const { atk, mid, def, phys } = stats
-        if (atk === 0 && mid === 0 && def === 0) return { type: '분석 불�?', emoji: '??, strategy: '?�수�?배정?�주?�요', color: 'text-slate-400' }
-
-        const avg = (atk + mid + def) / 3
-        const atkRatio = atk / avg
-        const defRatio = def / avg
-        const midRatio = mid / avg
-
-        // Determine team type based on stat distribution
-        if (atkRatio > 1.15 && defRatio < 0.9) {
-            return {
-                type: '공격??,
-                emoji: '?�️',
-                strategy: '?�극?�인 ?�박�?빠른 ??��???�리?�요',
-                color: 'text-red-600'
-            }
-        } else if (defRatio > 1.15 && atkRatio < 0.9) {
-            return {
-                type: '?�비??,
-                emoji: '?���?,
-                strategy: '견고???�비 ??카운???�택???�리?�요',
-                color: 'text-blue-600'
-            }
-        } else if (midRatio > 1.1) {
-            return {
-                type: '?�유??,
-                emoji: '?��',
-                strategy: '�??�유�??�이�??�스�?공간??만드?�요',
-                color: 'text-purple-600'
-            }
-        } else if (phys > (atk + mid + def) * 0.35) {
-            return {
-                type: '체력??,
-                emoji: '?��',
-                strategy: '?�반 체력 ?�위�??��??�세??,
-                color: 'text-amber-600'
-            }
-        }
-        return {
-            type: '밸런?�형',
-            emoji: '?�️',
-            strategy: '?�황??맞게 ?�연?�게 ?�?�하?�요',
-            color: 'text-emerald-600'
         }
     }
 
@@ -127,10 +107,10 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
             {/* Unassigned Area */}
             <div className="bg-slate-100 p-4 rounded-xl border border-dashed border-slate-300">
                 <h3 className="font-bold text-slate-500 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Users size={14} /> 미배???�수 (?��?명단)
+                    <Users size={14} /> 미배정 선수 (대기 명단)
                 </h3>
                 {unassigned.length === 0 ? (
-                    <p className="text-xs text-slate-400">?��?중인 ?�수가 ?�습?�다.</p>
+                    <p className="text-xs text-slate-400">대기 중인 선수가 없습니다.</p>
                 ) : (
                     <div className="flex flex-wrap gap-2">
                         {unassigned.map(p => (
@@ -142,7 +122,7 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                         onChange={(e) => onAssign(p.id, Number(e.target.value))}
                                         value=""
                                     >
-                                        <option value="" disabled>?� ?�택...</option>
+                                        <option value="" disabled>팀 선택...</option>
                                         {teams.map(t => (
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
@@ -158,107 +138,79 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {teams.map((team, idx) => {
                     const style = colors[idx % colors.length]
-                    const stats = getTeamStats(team.players)
-                    const maxStat = Math.max(stats.atk, stats.mid, stats.def, stats.phys, 1)
-                    const ruleBasedChar = getTeamCharacter(stats)
-                    const aiInfo = getTeamAiInfo(team)
-
-                    // Use AI info if available, otherwise fallback to rule-based
-                    const displayInfo = aiInfo ? {
-                        type: aiInfo.type,
-                        emoji: aiInfo.emoji,
-                        strategy: aiInfo.strategy,
-                        color: 'text-purple-600',
-                        keyPlayer: aiInfo.keyPlayer,
-                        keyPlayerReason: aiInfo.keyPlayerReason
-                    } : ruleBasedChar
-
+                    const power = calculateTeamPower(team.players)
+                    const teamAi = getTeamAi(team)
                     return (
-                        <div key={team.id} className={cn("p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md flex flex-col h-full", style.bg, style.border)}>
-                            <div className="flex items-center gap-3 mb-3">
+                        <div key={team.id} className={cn("p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md", style.bg, style.border)}>
+                            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/50">
                                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-md", style.badge)}>
-                                    {team.name?.[0]}
+                                    {teamAi?.emoji || team.name?.[0]}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h3 className={cn("font-bold text-lg truncate", style.text)}>{team.name}</h3>
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn("text-xs font-bold", displayInfo.color)}>
-                                            {displayInfo.emoji} {displayInfo.type}
-                                            {aiInfo && <span className="ml-1 text-[9px] bg-purple-100 text-purple-600 px-1 rounded">AI</span>}
-                                        </span>
-                                        <span className="text-xs text-slate-400">??{team.players?.length || 0}�?/span>
-                                    </div>
+                                    {teamAi && (
+                                        <span className="text-xs font-medium text-slate-500">{teamAi.type}</span>
+                                    )}
+                                </div>
+                                <div className="bg-white/50 px-2 py-0.5 rounded text-xs font-bold opacity-70">
+                                    {team.players?.length || 0}명
                                 </div>
                             </div>
 
-                            {/* Strategy Tip */}
-                            {team.players?.length > 0 && (
-                                <div className={cn("mb-3 p-2 rounded-lg border", aiInfo ? "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-100" : "bg-white/60 border-white/80")}>
-                                    <div className="text-[10px] text-slate-500 font-medium">{aiInfo ? '?�� AI ?�략' : '?�� ?�략 ??}</div>
-                                    <div className="text-xs text-slate-700 font-medium">{displayInfo.strategy}</div>
-                                    {aiInfo?.keyPlayer && (
-                                        <div className="mt-1 text-[10px] text-purple-600">
-                                            �??�심: <span className="font-bold">{aiInfo.keyPlayer}</span> - {aiInfo.keyPlayerReason}
-                                        </div>
-                                    )}
+                            {/* AI Strategy Analysis (from stored score_stats) */}
+                            {teamAi && (
+                                <div className="mb-4 p-3 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
+                                    <div className="flex items-center gap-1 mb-2">
+                                        <span className="text-xs font-bold text-purple-700">🤖 AI 전략</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 leading-relaxed mb-2">{teamAi.strategy}</p>
+                                    <div className="text-xs">
+                                        <span className="font-bold text-indigo-600">⭐ 핵심선수:</span>
+                                        <span className="ml-1 text-slate-700">{teamAi.keyPlayer}</span>
+                                        {teamAi.keyPlayerReason && (
+                                            <span className="text-slate-400 ml-1">- {teamAi.keyPlayerReason}</span>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
-                            {/* Balance Indicators */}
-                            <div className="mb-4 space-y-2 bg-white/40 p-3 rounded-xl">
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                                    <span className="w-8">공격</span>
-                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${(stats.atk / (maxStat * 1.2)) * 100}%` }}></div>
+                            {/* Team Power Analysis */}
+                            {power && (
+                                <div className="mb-4 p-3 bg-white/70 rounded-xl space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="font-bold text-slate-500">전력 분석</span>
+                                        <span className={cn("font-black text-lg", style.text)}>{power.overall}</span>
                                     </div>
-                                    <span className="w-6 text-right">{stats.atk}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                                    <span className="w-8">미드</span>
-                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${(stats.mid / (maxStat * 1.2)) * 100}%` }}></div>
+                                    <div className="space-y-1.5">
+                                        {[
+                                            { label: '공격', value: power.attack, emoji: '⚔️' },
+                                            { label: '수비', value: power.defense, emoji: '🛡️' },
+                                            { label: '미드', value: power.midfield, emoji: '🎯' },
+                                            { label: '체력', value: power.physical, emoji: '💪' },
+                                        ].map(stat => (
+                                            <div key={stat.label} className="flex items-center gap-2">
+                                                <span className="text-xs w-4">{stat.emoji}</span>
+                                                <span className="text-[10px] text-slate-500 w-8">{stat.label}</span>
+                                                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={cn("h-full rounded-full transition-all", style.bar)}
+                                                        style={{ width: `${stat.value}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-600 w-6 text-right">{stat.value}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <span className="w-6 text-right">{stats.mid}</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
-                                    <span className="w-8">?�비</span>
-                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className={cn("h-full rounded-full", style.bar)} style={{ width: `${(stats.def / (maxStat * 1.2)) * 100}%` }}></div>
-                                    </div>
-                                    <span className="w-6 text-right">{stats.def}</span>
-                                </div>
-                                <div className="pt-1 mt-1 border-t border-white/50 flex justify-between text-xs font-bold text-slate-500">
-                                    <span>밸런???�수</span>
-                                    <span>{stats.total}</span>
-                                </div>
-                            </div>
+                            )}
 
-                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 flex-1">
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                                 {team.players && team.players.length > 0 ? (
                                     team.players.map((m: any) => (
                                         <div key={m.id} className="flex items-center justify-between p-2 rounded-lg bg-white/60 hover:bg-white/80 transition-colors group">
                                             <div className="flex items-center gap-2">
                                                 <div className={cn("w-1.5 h-1.5 rounded-full", style.badge)}></div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-medium text-slate-700">{m.name}</span>
-                                                    {/* Admin View: Chemistry Preferences */}
-                                                    {isAdmin && (
-                                                        <div className="flex gap-1 text-[10px] text-slate-400">
-                                                            {(() => {
-                                                                // Find prefs for this player (m.id)
-                                                                // Assumes preferences prop is passed to TabTeams (which I need to update in parent too)
-                                                                // Wait, I can't easily access 'preferences' here without passing it down.
-                                                                // I'll add a 'data-prefs' attribute or just render if I have the data.
-                                                                // Let's assume 'preferences' is passed in props.
-                                                                return preferences?.filter((p: any) => p.player_id === m.id).map((p: any) => (
-                                                                    <span key={p.rank} className={cn("px-1 rounded bg-slate-100", p.rank === 1 && "text-pink-600 bg-pink-50 font-bold")}>
-                                                                        {p.rank}:{p.target_name}
-                                                                    </span>
-                                                                ))
-                                                            })()}
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                <span className="text-sm font-medium text-slate-700">{m.name}</span>
                                             </div>
                                             {isAdmin && (
                                                 <select
@@ -269,8 +221,8 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                                     }}
                                                     value={team.id}
                                                 >
-                                                    <option value={team.id} disabled>?�동</option>
-                                                    <option value="unassign">미배??/option>
+                                                    <option value={team.id} disabled>이동</option>
+                                                    <option value="unassign">미배정</option>
                                                     {teams.filter((t: any) => t.id !== team.id).map((t: any) => (
                                                         <option key={t.id} value={t.id}>{t.name}</option>
                                                     ))}
@@ -279,7 +231,7 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-sm opacity-50 text-center py-4">?�?�이 ?�습?�다.</div>
+                                    <div className="text-sm opacity-50 text-center py-4">팀원이 없습니다.</div>
                                 )}
                             </div>
                         </div>
@@ -290,37 +242,19 @@ function TabTeams({ teams, players, onAssign, isAdmin, preferences }: { teams: a
     )
 }
 
-function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRecordEvent, onAddMatch, onDeleteMatch, onClearMatches, onRegenMatches, onAutoFillMatches, sessionId }: {
+function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, onAddMatch, onDeleteMatch, onClearMatches, onRegenMatches, onAutoFillMatches, sessionId }: {
     matches: any[],
     teams: any[],
     onUpdateMatch: (id: number, data: any) => void,
     isAdmin: boolean,
-    canRecord: boolean,
-    onRecordEvent: (mid: number, event: any) => void,
     onAddMatch: () => void,
     onDeleteMatch: (id: number) => void,
     onClearMatches: () => void,
     onRegenMatches: () => void,
     onAutoFillMatches: () => void,
-    sessionId: string | undefined
+    sessionId: string
 }) {
-    // Goal Modal State
-    const [goalModal, setGoalModal] = useState<{ matchId: number, teamId: number } | null>(null)
-    const [selectedScorer, setSelectedScorer] = useState<string>('')
-    const [selectedAssister, setSelectedAssister] = useState<string>('')
-
-    const handleSaveGoal = () => {
-        if (!goalModal || !selectedScorer) return alert('?�점?��? ?�택?�주?�요')
-        onRecordEvent(goalModal.matchId, {
-            type: 'GOAL',
-            scorerId: Number(selectedScorer),
-            assisterId: selectedAssister ? Number(selectedAssister) : null,
-            teamId: goalModal.teamId
-        })
-        setGoalModal(null)
-        setSelectedScorer('')
-        setSelectedAssister('')
-    }
+    const navigate = useNavigate()
 
     // Calculate Standings
     const standings = teams.map(t => ({
@@ -356,112 +290,133 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
         <div id="capture-area-scoreboard" className="space-y-8">
             {/* Standings */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <table className="w-full text-sm text-center">
-                    <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100 text-xs uppercase tracking-wider">
-                        <tr>
-                            <th className="px-4 py-3 w-12 text-left whitespace-nowrap">?�위</th>
-                            <th className="px-4 py-3 text-left whitespace-nowrap">?�</th>
-                            <th className="px-2 py-3 whitespace-nowrap">경기</th>
-                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">??/th>
-                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">�?/th>
-                            <th className="px-2 py-3 text-slate-400 whitespace-nowrap">??/th>
-                            <th className="px-2 py-3 whitespace-nowrap">?�실</th>
-                            <th className="px-4 py-3 font-bold text-blue-600 whitespace-nowrap">?�점</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {standings.map((t, i) => (
-                            <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-4 py-3 text-left font-bold text-slate-400">{i + 1}</td>
-                                <td className="px-4 py-3 text-left font-bold text-slate-900">{t.name}</td>
-                                <td className="px-2 py-3 text-slate-600">{t.played}</td>
-                                <td className="px-2 py-3 text-slate-400">{t.won}</td>
-                                <td className="px-2 py-3 text-slate-400">{t.drawn}</td>
-                                <td className="px-2 py-3 text-slate-400">{t.lost}</td>
-                                <td className="px-2 py-3 font-medium text-slate-600">{t.gf - t.ga > 0 ? `+${t.gf - t.ga}` : t.gf - t.ga}</td>
-                                <td className="px-4 py-3 font-extrabold text-blue-600 text-base">{t.points}</td>
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y divide-slate-100">
+                    {standings.map((t, i) => (
+                        <div key={t.id} className="p-4 flex items-center gap-4">
+                            <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
+                                i === 0 ? "bg-yellow-100 text-yellow-700" :
+                                    i === 1 ? "bg-slate-200 text-slate-700" :
+                                        i === 2 ? "bg-orange-100 text-orange-700" : "bg-slate-100 text-slate-500"
+                            )}>
+                                {i + 1}
+                            </div>
+                            <div className="flex-1">
+                                <div className="font-bold text-slate-900">{t.name}</div>
+                                <div className="text-xs text-slate-400">{t.played}경기 · {t.won}승 {t.drawn}무 {t.lost}패</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="font-extrabold text-xl text-blue-600">{t.points}</div>
+                                <div className="text-xs text-slate-400">득실 {t.gf - t.ga > 0 ? `+${t.gf - t.ga}` : t.gf - t.ga}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm text-center">
+                        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th className="px-3 py-3 w-10 text-left">순위</th>
+                                <th className="px-3 py-3 text-left">팀</th>
+                                <th className="px-2 py-3">경기</th>
+                                <th className="px-2 py-3 text-slate-400">승</th>
+                                <th className="px-2 py-3 text-slate-400">무</th>
+                                <th className="px-2 py-3 text-slate-400">패</th>
+                                <th className="px-2 py-3">득실</th>
+                                <th className="px-3 py-3 font-bold text-blue-600">승점</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {standings.map((t, i) => (
+                                <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-3 py-3 text-left font-bold text-slate-400">{i + 1}</td>
+                                    <td className="px-3 py-3 text-left font-bold text-slate-900">{t.name}</td>
+                                    <td className="px-2 py-3 text-slate-600">{t.played}</td>
+                                    <td className="px-2 py-3 text-slate-400">{t.won}</td>
+                                    <td className="px-2 py-3 text-slate-400">{t.drawn}</td>
+                                    <td className="px-2 py-3 text-slate-400">{t.lost}</td>
+                                    <td className="px-2 py-3 font-medium text-slate-600">{t.gf - t.ga > 0 ? `+${t.gf - t.ga}` : t.gf - t.ga}</td>
+                                    <td className="px-3 py-3 font-extrabold text-blue-600 text-base">{t.points}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Matches */}
             <div className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                        <Activity size={18} /> 매치 ?�정
+                        <Activity size={18} /> 매치 일정
                     </h3>
                     {isAdmin && (
                         <div className="flex flex-wrap gap-2 text-xs">
-                            <button onClick={onRegenMatches} className="px-2 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-bold whitespace-nowrap text-[11px]">
-                                ???�생??
+                            <button onClick={onRegenMatches} className="px-2 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-bold">
+                                ↻ 재생성
                             </button>
-                            <button onClick={onAutoFillMatches} className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-bold whitespace-nowrap text-[11px]">
-                                + 로테?�션
+                            <button onClick={onAutoFillMatches} className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-bold">
+                                + 채움
                             </button>
-                            <button onClick={onClearMatches} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold whitespace-nowrap text-[11px]">
-                                ??��
+                            <button onClick={onClearMatches} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold">
+                                삭제
                             </button>
-                            <button onClick={onAddMatch} className="px-2 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-bold whitespace-nowrap text-[11px]">
-                                + 추�?
+                            <button onClick={onAddMatch} className="px-2 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-bold">
+                                + 추가
                             </button>
                         </div>
                     )}
                 </div>
 
-                {matches.length === 0 && <p className="text-slate-400 text-center py-10">?�정???�습?�다.</p>}
+                {matches.length === 0 && <p className="text-slate-400 text-center py-10">일정이 없습니다.</p>}
 
-                <div className="grid gap-3 overflow-hidden">
+                <div className="grid gap-3">
                     {matches.map(m => {
                         const t1 = teams.find(t => t.id === m.team1_id)
                         const t2 = teams.find(t => t.id === m.team2_id)
                         return (
-                            <div key={m.id} className="bg-white p-3 md:p-4 rounded-xl border border-slate-200 flex items-center shadow-sm relative group overflow-hidden">
-                                <div className="font-bold text-slate-300 w-6 md:w-8 text-xs shrink-0">#{m.match_no}</div>
-                                <div className="flex-1 flex items-center justify-center gap-1 md:gap-4 min-w-0">
+                            <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm relative group">
+                                <div className="font-bold text-slate-300 w-8 text-xs">#{m.match_no}</div>
+                                <div className="flex-1 flex items-center justify-center gap-2 md:gap-4">
 
                                     {/* Team 1 */}
                                     {isAdmin ? (
                                         <select
                                             value={m.team1_id}
                                             onChange={(e) => onUpdateMatch(m.id, { team1_id: Number(e.target.value) })}
-                                            className="flex-1 min-w-0 text-right text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
+                                            className="w-20 md:w-32 text-right text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
                                         >
                                             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                         </select>
                                     ) : (
-                                        <span className="flex-1 min-w-0 font-bold text-slate-800 text-right truncate text-sm">{t1?.name}</span>
+                                        <span className="font-bold text-slate-800 w-24 md:w-32 text-right truncate text-sm">{t1?.name}</span>
                                     )}
 
-                                    {canRecord ? (
-                                        <Link
-                                            to={`/sessions/${sessionId}/match/${m.id}/record`}
-                                            className="flex-shrink-0 flex items-center gap-2 bg-slate-50 hover:bg-emerald-50 px-3 py-2 rounded-xl border border-slate-100 hover:border-emerald-200 shadow-inner transition-colors cursor-pointer"
-                                        >
-                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team1_score}</span>
-                                            <span className="text-slate-300 font-bold text-sm">:</span>
-                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team2_score}</span>
-                                        </Link>
-                                    ) : (
-                                        <div className="flex-shrink-0 flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 shadow-inner">
-                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team1_score}</span>
-                                            <span className="text-slate-300 font-bold text-sm">:</span>
-                                            <span className="w-5 text-center font-black text-lg text-slate-900">{m.team2_score}</span>
-                                        </div>
-                                    )}
+                                    {/* Score - Click to open match live page */}
+                                    <button
+                                        onClick={() => navigate(`/sessions/${sessionId}/match/${m.id}/record`)}
+                                        className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 shadow-inner hover:bg-slate-100 hover:border-blue-200 transition-all cursor-pointer group"
+                                        title="클릭하여 기록 페이지로 이동"
+                                    >
+                                        <span className="w-8 text-center font-black text-2xl text-slate-900 group-hover:text-blue-600 transition-colors">{m.team1_score ?? 0}</span>
+                                        <span className="text-slate-300 font-bold">:</span>
+                                        <span className="w-8 text-center font-black text-2xl text-slate-900 group-hover:text-blue-600 transition-colors">{m.team2_score ?? 0}</span>
+                                    </button>
 
                                     {/* Team 2 */}
                                     {isAdmin ? (
                                         <select
                                             value={m.team2_id}
                                             onChange={(e) => onUpdateMatch(m.id, { team2_id: Number(e.target.value) })}
-                                            className="flex-1 min-w-0 text-left text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
+                                            className="w-20 md:w-32 text-left text-sm font-bold bg-transparent border-b border-slate-100 focus:border-blue-500 outline-none truncate"
                                         >
                                             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                         </select>
                                     ) : (
-                                        <span className="flex-1 min-w-0 font-bold text-slate-800 text-left truncate text-sm">{t2?.name}</span>
+                                        <span className="font-bold text-slate-800 w-24 md:w-32 text-left truncate text-sm">{t2?.name}</span>
                                     )}
                                 </div>
                                 {isAdmin && (
@@ -474,76 +429,22 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, canRecord, onRe
                     })}
                 </div>
             </div>
-
-            {/* Goal Modal */}
-            {goalModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-                        <h3 className="font-bold text-lg text-center">�?기록</h3>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500">?�점??(�?</label>
-                            <select
-                                value={selectedScorer}
-                                onChange={e => setSelectedScorer(e.target.value)}
-                                className="w-full mt-1 p-3 bg-slate-50 rounded-xl font-bold border border-slate-200"
-                            >
-                                <option value="">?�택?�세??/option>
-                                {teams.find(t => t.id === goalModal.teamId)?.players?.map((p: any) => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-500">?��? (?�시?�트)</label>
-                            <select
-                                value={selectedAssister}
-                                onChange={e => setSelectedAssister(e.target.value)}
-                                className="w-full mt-1 p-3 bg-slate-50 rounded-xl font-bold border border-slate-200"
-                            >
-                                <option value="">?�음 (개인 ?�파)</option>
-                                {teams.find(t => t.id === goalModal.teamId)?.players?.filter((p: any) => p.id !== Number(selectedScorer)).map((p: any) => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                            <button onClick={() => setGoalModal(null)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-600">취소</button>
-                            <button onClick={handleSaveGoal} className="flex-1 py-3 bg-blue-600 rounded-xl font-bold text-white shadow-lg shadow-blue-500/30">기록 ?�??/button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
 
-// Helper for Season Title
-function getSeasonTitle(dateStr: string) {
-    if (!dateStr) return '?�기 ?�살'
-    const date = new Date(dateStr)
-    const year = date.getFullYear()
-    const firstJan = new Date(year, 0, 1)
-    const day = firstJan.getDay()
-    const diff = (3 - day + 7) % 7
-    const firstWed = new Date(year, 0, 1 + diff)
-
-    const msDiff = date.getTime() - firstWed.getTime()
-    if (msDiff < 0) return `${year} ?�리?�즌`
-
-    const weekNum = Math.floor(msDiff / (7 * 24 * 60 * 60 * 1000)) + 1
-    return `${year}?�즌 ${weekNum}경기`
-}
-
 export default function SessionDetail() {
     const { id } = useParams()
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const initialTab = (searchParams.get('tab') as 'overview' | 'teams' | 'scoreboard') || 'overview'
     const [session, setSession] = useState<any>(null)
     const [error, setError] = useState<string | null>(null)
-    const [activeTab, setActiveTab] = useState<'overview' | 'teams' | 'scoreboard'>('overview')
+    const [activeTab, setActiveTab] = useState<'overview' | 'teams' | 'scoreboard'>(initialTab)
 
     // Auth State
     const role = localStorage.getItem('user_role')
     const isAdmin = ['admin', 'ADMIN', 'owner', 'OWNER'].includes(role || '')
-    const canRecord = isAdmin || ['recorder', 'RECORDER'].includes(role || '')
 
     // Admin Actions State
     const [parseText, setParseText] = useState('')
@@ -556,12 +457,13 @@ export default function SessionDetail() {
             .then(data => {
                 if (data.error) throw new Error(data.error)
                 setSession(data)
-                if (data.status === 'closed' && data.teams?.length > 0) {
+                // Only auto-switch to teams if no tab specified in URL and session is closed
+                if (!searchParams.get('tab') && data.status === 'closed' && data.teams?.length > 0) {
                     setActiveTab('teams')
                 }
             })
-            .catch(() => setError('?�션??찾을 ???�거???�결 ?�패'))
-    }, [id])
+            .catch(() => setError('세션을 찾을 수 없거나 연결 실패'))
+    }, [id, searchParams])
 
     const refreshSession = async () => {
         try {
@@ -593,16 +495,16 @@ export default function SessionDetail() {
 
         const totalCount = parseResult.matched.length + parseResult.unknown.length
         const confirmMsg = parseResult.unknown.length > 0
-            ? `기존 ?�원 ${parseResult.matched.length}명과 ?�규(미등�? ${parseResult.unknown.length}명을 ?�함?�여 �?${totalCount}명을 ?�록?�시겠습?�까?\n(?�규 ?�원?� ?�동 ?�성?�니??`
-            : `�?${totalCount}명의 참석?��? ?�록?�시겠습?�까?`
+            ? `기존 회원 ${parseResult.matched.length}명과 신규(미등록) ${parseResult.unknown.length}명을 포함하여 총 ${totalCount}명을 등록하시겠습니까?\n(신규 회원은 자동 생성됩니다)`
+            : `총 ${totalCount}명의 참석자를 등록하시겠습니까?`
 
         if (!confirm(confirmMsg)) return
 
+        const token = localStorage.getItem('auth_token')
         let playerIds = parseResult.matched.map((p: any) => p.id)
 
         if (parseResult.unknown.length > 0) {
             try {
-                const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
                 const newIds = await Promise.all(parseResult.unknown.map(async (name) => {
                     const res = await fetch(`${API_URL}/players`, {
                         method: 'POST',
@@ -613,16 +515,18 @@ export default function SessionDetail() {
                         body: JSON.stringify({ name })
                     })
                     const data = await res.json()
+                    if (data.error) {
+                        throw new Error(data.error)
+                    }
                     return data.id
                 }))
                 playerIds = [...playerIds, ...newIds]
-            } catch (e) {
-                alert('?�규 ?�원 ?�성 �??�류가 발생?�습?�다.')
+            } catch (e: any) {
+                alert('신규 회원 생성 중 오류가 발생했습니다: ' + (e.message || e))
                 return
             }
         }
 
-        const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
         await fetch(`${API_URL}/sessions/${id}/attendance`, {
             method: 'PUT',
             headers: {
@@ -631,23 +535,19 @@ export default function SessionDetail() {
             },
             body: JSON.stringify({ player_ids: playerIds })
         })
-        alert('?�?�되?�습?�다.')
+        alert('저장되었습니다.')
         setParseResult(null)
         setParseText('')
         refreshSession()
     }
 
     const handleStatusChange = async (newStatus: string) => {
-        if (newStatus === 'closed' && !confirm('마감 처리 ?�시겠습?�까? ???�상 참석?��? ?�정?????�게 ?�니??')) return
-        if (newStatus === 'recruiting' && !confirm('마감??취소?�고 ?�시 모집 중으�?변경하?�겠?�니�?')) return
+        if (newStatus === 'closed' && !confirm('마감 처리 하시겠습니까? 더 이상 참석자를 수정할 수 없게 됩니다.')) return
+        if (newStatus === 'recruiting' && !confirm('마감을 취소하고 다시 모집 중으로 변경하시겠습니까?')) return
 
-        const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
         await fetch(`${API_URL}/sessions/${id}/status`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus })
         })
         refreshSession()
@@ -657,36 +557,19 @@ export default function SessionDetail() {
 
     // Generate Teams
     const handleGenerateTeams = async () => {
-        if (!confirm('기존 ?� 구성??모두 초기?�되�??�로 ?�성?�니?? 계속?�시겠습?�까? (??��?�기)')) return
+        if (!confirm('기존 팀 구성이 모두 초기화되고 새로 생성됩니다. 계속하시겠습니까? (덮어쓰기)')) return
         try {
-            const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
             const res = await fetch(`${API_URL}/sessions/${id}/teams/generate`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ numTeams: 3 })
             })
-            const data = await res.json()
-            if (res.ok && data.success) {
-                // Show balance info
-                const score = Math.round(data.balanceScore || 0)
-                const msg = `???� ?�성 ?�료!\n\n밸런???�수: ${score}??n\n` +
-                    `?�� ?�성 ?�약:\n` +
-                    `- ${data.teams?.length || 0}�??� 구성\n` +
-                    `- ${data.match_count || 0}경기 ?�성\n` +
-                    (score >= 80 ? '�??�주 균형?�힌 ?� 구성?�니??' :
-                        score >= 60 ? '?�� ?�절??밸런?�입?�다.' :
-                            '?�️ ?�수 ?�력�??�차가 ?�습?�다.')
-                alert(msg)
+            if (res.ok) {
+                // Refresh
                 window.location.reload()
-            } else {
-                alert('?� ?�성 ?�패: ' + (data.error || '?????�는 ?�류'))
             }
         } catch (error) {
             console.error(error)
-            alert('?� ?�성 �??�류가 발생?�습?�다.')
         }
     }
 
@@ -708,29 +591,14 @@ export default function SessionDetail() {
         }
     }
 
-    // Record Goal Event
-    const handleRecordEvent = async (matchId: number, event: any) => {
-        try {
-            await fetch(`${API_URL}/matches/${matchId}/events`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(event)
-            })
-            refreshSession() // Reload session to get updated scores
-        } catch (error) {
-            console.error(error)
-            alert('기록 ?�패')
-        }
-    }
-
     const handleClearMatches = async () => {
-        if (!confirm('모든 경기�???��?�시겠습?�까?')) return
+        if (!confirm('모든 경기를 삭제하시겠습니까?')) return
         await fetch(`${API_URL}/sessions/${id}/matches`, { method: 'DELETE' })
         refreshSession()
     }
 
     const handleRegenMatches = async () => {
-        if (!confirm('기존 경기�???��?�고 9경기�??�로 ?�성?�니??')) return
+        if (!confirm('기존 경기를 삭제하고 9경기를 새로 생성합니다.')) return
         await fetch(`${API_URL}/sessions/${id}/matches/generate`, { method: 'POST' })
         refreshSession()
     }
@@ -741,7 +609,7 @@ export default function SessionDetail() {
     }
 
     const handleAddMatch = async () => {
-        if (!session.teams || session.teams.length < 2) return alert('?�??최소 2�??�요?�니??')
+        if (!session.teams || session.teams.length < 2) return alert('팀이 최소 2개 필요합니다.')
 
         await fetch(`${API_URL}/matches`, {
             method: 'POST',
@@ -756,7 +624,7 @@ export default function SessionDetail() {
     }
 
     const handleDeleteMatch = async (mid: number) => {
-        if (!confirm('경기�???��?�시겠습?�까?')) return
+        if (!confirm('경기를 삭제하시겠습니까?')) return
         await fetch(`${API_URL}/matches/${mid}`, { method: 'DELETE' })
         refreshSession()
     }
@@ -770,63 +638,53 @@ export default function SessionDetail() {
         refreshSession()
     }
 
+    const handleDeleteSession = async () => {
+        if (!confirm('⚠️ 이 일정을 삭제하시겠습니까?\n\n모든 팀, 경기, 참석자 기록이 함께 삭제됩니다.\n이 작업은 되돌릴 수 없습니다!')) return
+
+        try {
+            const token = localStorage.getItem('auth_token')
+            await fetch(`${API_URL}/sessions/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            alert('일정이 삭제되었습니다.')
+            navigate('/sessions')
+        } catch (e) {
+            alert('삭제 중 오류가 발생했습니다.')
+        }
+    }
+
     const handleCapture = async () => {
         const elementId = `capture-area-${activeTab}`
         const element = document.getElementById(elementId)
         if (!element) return
 
         try {
-            // Add a temporary 'export-mode' class to style specifically for export if needed
-            element.classList.add('p-4', 'bg-white')
-
-            const canvas = await html2canvas(element, {
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                scale: 2,
-                logging: false,
-            })
-
-            element.classList.remove('p-4', 'bg-white')
-
+            const canvas = await html2canvas(element, { useCORS: true, backgroundColor: '#ffffff', scale: 2 })
             const link = document.createElement('a')
             link.href = canvas.toDataURL('image/png')
-            const dateStr = session.session_date.replace(/-/g, '')
-            link.download = `ConerKicks_${dateStr}_${activeTab}.png`
+            link.download = `wed_futsal_${session.session_date}_${activeTab}.png`
             link.click()
         } catch (e) {
             console.error('Capture failed', e)
-            alert('?��?지 ?�?�에 ?�패?�습?�다.')
+            alert('이미지 저장에 실패했습니다.')
         }
     }
 
-    const [preferences, setPreferences] = useState<any[]>([])
-
-    useEffect(() => {
-        if (isAdmin) {
-            const token = localStorage.getItem('auth_token')
-            fetch(`${API_URL}/players/preferences`, { headers: { 'Authorization': `Bearer ${token}` } })
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) setPreferences(data)
-                })
-                .catch(err => console.error(err))
-        }
-    }, [isAdmin])
-
     if (error) return (
         <div className="p-20 text-center">
-            <h2 className="text-xl font-bold text-slate-700 mb-2">?�류 발생</h2>
+            <h2 className="text-xl font-bold text-slate-700 mb-2">오류 발생</h2>
             <p className="text-slate-500">{error}</p>
-            <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-slate-200 rounded text-slate-700 font-bold">?�로고침</button>
+            <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-slate-200 rounded text-slate-700 font-bold">새로고침</button>
         </div>
     )
 
-    if (!session) return <div className="p-20 text-center text-slate-500 animate-pulse">?�이??로딩 �?..</div>
+    if (!session) return <div className="p-20 text-center text-slate-500 animate-pulse">데이터 로딩 중...</div>
 
     const tabs = [
         { id: 'overview' as const, label: '개요/참석', icon: ClipboardList },
-        { id: 'teams' as const, label: '?� 구성 (?�동)', icon: Shield },
-        { id: 'scoreboard' as const, label: '?�수??, icon: Activity },
+        { id: 'teams' as const, label: '팀 구성 (수동)', icon: Shield },
+        { id: 'scoreboard' as const, label: '점수판', icon: Activity },
     ]
 
     return (
@@ -837,7 +695,7 @@ export default function SessionDetail() {
                     onClick={handleCapture}
                     className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 font-bold"
                 >
-                    <Download size={14} /> ?��?지 ?�??
+                    <Download size={14} /> 이미지 저장
                 </button>
             </div>
 
@@ -855,9 +713,9 @@ export default function SessionDetail() {
                     </span>
                 </div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h1 className="text-3xl font-extrabold text-slate-900">{getSeasonTitle(session.session_date)}</h1>
+                    <h1 className="text-3xl font-extrabold text-slate-900">{session.title || '코너킥스 정기 풋살'}</h1>
                     <div className="flex items-center gap-4 text-slate-500 text-sm font-medium">
-                        <span className="flex items-center gap-1"><MapPin size={16} /> 경북?� A구장</span>
+                        <span className="flex items-center gap-1"><MapPin size={16} /> 경북대 A구장</span>
                     </div>
                 </div>
             </div>
@@ -866,18 +724,18 @@ export default function SessionDetail() {
             {isAdmin && (
                 <div className="bg-slate-900 rounded-2xl p-6 mb-8 text-white shadow-xl">
                     <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-                        <Lock size={18} className="text-yellow-400" /> 관리자 컨트�??�널
+                        <Lock size={18} className="text-yellow-400" /> 관리자 컨트롤 패널
                     </h2>
 
                     {/* Step 1: Manage Attendees (Only if recruiting) */}
                     {session.status === 'recruiting' && (
                         <div className="space-y-4 mb-8 border-b border-slate-700 pb-6">
                             <label className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                                <Wand2 size={14} /> 카카?�톡 ?�표 붙여?�기 (참석??갱신)
+                                <Wand2 size={14} /> 카카오톡 투표 붙여넣기 (참석자 갱신)
                             </label>
                             <textarea
                                 className="w-full h-32 p-3 rounded-lg bg-slate-800 border border-slate-700 text-sm font-mono text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="카톡 ?�용??붙여?�으?�요..."
+                                placeholder="카톡 내용을 붙여넣으세요..."
                                 value={parseText}
                                 onChange={(e) => setParseText(e.target.value)}
                             />
@@ -887,7 +745,7 @@ export default function SessionDetail() {
                                     disabled={parsing || !parseText}
                                     className="px-4 py-2 bg-blue-600 rounded-lg text-sm font-bold hover:bg-blue-500 disabled:opacity-50"
                                 >
-                                    {parsing ? '분석 �?..' : '1. 분석?�기'}
+                                    {parsing ? '분석 중...' : '1. 분석하기'}
                                 </button>
 
                                 {parseResult && (
@@ -895,7 +753,7 @@ export default function SessionDetail() {
                                         onClick={handleSaveAttendees}
                                         className="px-4 py-2 bg-emerald-600 rounded-lg text-sm font-bold hover:bg-emerald-500 animate-pulse"
                                     >
-                                        2. 결과 ?�??(기존 {parseResult.matched.length}�?+ ?�규 {parseResult.unknown.length}�?
+                                        2. 결과 저장 (기존 {parseResult.matched.length}명 + 신규 {parseResult.unknown.length}명)
                                     </button>
                                 )}
                             </div>
@@ -910,7 +768,7 @@ export default function SessionDetail() {
                                         ))}
                                         {parseResult.unknown.map((name, i) => (
                                             <span key={`u-${i}`} className="px-2 py-1 bg-yellow-900/50 text-yellow-400 border border-yellow-800 rounded text-xs flex items-center gap-1">
-                                                <Wand2 size={10} /> {name} (?�규)
+                                                <Wand2 size={10} /> {name} (신규)
                                             </span>
                                         ))}
                                     </div>
@@ -931,12 +789,12 @@ export default function SessionDetail() {
                         ) : (
                             <div className="flex items-center gap-2">
                                 <button className="px-6 py-3 bg-slate-700 text-slate-400 rounded-xl font-bold flex items-center gap-2 cursor-not-allowed">
-                                    <Lock size={18} /> 마감 ?�료??
+                                    <Lock size={18} /> 마감 완료됨
                                 </button>
                                 <button
                                     onClick={() => handleStatusChange('recruiting')}
                                     className="px-4 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-700 hover:text-white border border-slate-700"
-                                    title="마감 취소 (?�시 모집 중으�?변�?"
+                                    title="마감 취소 (다시 모집 중으로 변경)"
                                 >
                                     <RefreshCw size={18} /> 마감 취소
                                 </button>
@@ -953,29 +811,39 @@ export default function SessionDetail() {
                                 session.status === 'closed'
                                     ? "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20"
                                     : "bg-slate-800 text-slate-500 cursor-not-allowed"
-                            )}
+                            )}>
+                            <Shield size={18} /> 팀 자동 생성
+                        </button>
+
+                        <div className="h-8 w-px bg-slate-700 mx-2 hidden md:block"></div>
+
+                        <button
+                            onClick={handleDeleteSession}
+                            className="px-4 py-3 bg-red-900/50 text-red-300 rounded-xl font-bold flex items-center gap-2 hover:bg-red-800 hover:text-white border border-red-800 transition-colors"
+                            title="이 일정 삭제"
                         >
-                            <Shield size={18} /> ?� ?�동 ?�성
+                            🗑️ 일정 삭제
                         </button>
                     </div>
                 </div>
             )}
 
             {/* Tabs */}
-            <div className="flex overflow-x-auto gap-2 mb-6 p-1 bg-slate-100/50 rounded-xl border border-slate-100 w-fit">
+            <div className="grid grid-cols-3 gap-1 mb-6 p-1 bg-slate-100/50 rounded-xl border border-slate-100">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={cn(
-                            "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap",
+                            "flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all",
                             activeTab === tab.id
                                 ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
                                 : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                         )}
                     >
-                        <tab.icon size={16} className={activeTab === tab.id ? "text-blue-600" : ""} />
-                        {tab.label}
+                        <tab.icon size={14} className={activeTab === tab.id ? "text-blue-600" : ""} />
+                        <span className="hidden sm:inline">{tab.label}</span>
+                        <span className="sm:hidden">{tab.id === 'overview' ? '개요' : tab.id === 'teams' ? '팀' : '결과'}</span>
                     </button>
                 ))}
             </div>
@@ -985,11 +853,11 @@ export default function SessionDetail() {
                 {activeTab === 'overview' && <TabOverview players={session.players || []} status={session.status} />}
                 {activeTab === 'teams' && (
                     <TabTeams
-                        teams={session.teams}
-                        players={session.players}
+                        teams={session.teams || []}
+                        players={session.players || []}
                         onAssign={handleAssignPlayer}
                         isAdmin={isAdmin}
-                        preferences={preferences}
+                        sessionId={id!}
                     />
                 )}
                 {activeTab === 'scoreboard' && (
@@ -998,19 +866,15 @@ export default function SessionDetail() {
                         teams={session.teams || []}
                         onUpdateMatch={handleUpdateMatch}
                         isAdmin={isAdmin}
-                        canRecord={canRecord}
-                        onRecordEvent={handleRecordEvent}
                         onAddMatch={handleAddMatch}
                         onDeleteMatch={handleDeleteMatch}
                         onClearMatches={handleClearMatches}
                         onRegenMatches={handleRegenMatches}
                         onAutoFillMatches={handleAutoFillMatches}
-                        sessionId={id}
+                        sessionId={id!}
                     />
                 )}
             </div>
         </div>
     )
 }
-
-

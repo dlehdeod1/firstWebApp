@@ -39,7 +39,7 @@
     --nav-bg: rgba(15, 23, 42, 0.9);
 }
 
-/* Base styles for dark mode */
+/* Base styles */
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
@@ -63,4 +63,99 @@ body {
 
 .dark ::-webkit-scrollbar-thumb:hover {
     background: #475569;
+}
+
+/* Dark mode component overrides */
+.dark .bg-white {
+    background-color: var(--card-bg) !important;
+}
+
+.dark .bg-slate-50 {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.dark .bg-slate-100 {
+    background-color: #1e293b !important;
+}
+
+.dark .text-slate-900 {
+    color: var(--text-primary) !important;
+}
+
+.dark .text-slate-800 {
+    color: #e2e8f0 !important;
+}
+
+.dark .text-slate-700 {
+    color: #cbd5e1 !important;
+}
+
+.dark .text-slate-600 {
+    color: #94a3b8 !important;
+}
+
+.dark .text-slate-500 {
+    color: #64748b !important;
+}
+
+.dark .text-slate-400 {
+    color: #475569 !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+    border-color: var(--border-color) !important;
+}
+
+.dark .divide-slate-100> :not([hidden])~ :not([hidden]),
+.dark .divide-slate-200> :not([hidden])~ :not([hidden]) {
+    border-color: var(--border-color) !important;
+}
+
+/* Table dark mode */
+.dark table thead {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.dark table tbody tr:hover {
+    background-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Card hover effects */
+.dark .hover\:bg-slate-50:hover {
+    background-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Input fields */
+.dark input,
+.dark textarea,
+.dark select {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+    color: var(--text-muted) !important;
+}
+
+/* Navigation */
+.dark nav {
+    background-color: var(--nav-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Footer */
+.dark footer {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Shadows for dark mode */
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
 }

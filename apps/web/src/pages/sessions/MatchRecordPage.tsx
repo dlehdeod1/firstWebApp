@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Play, Pause, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+
 interface Player {
     id: number
     name: string
@@ -144,7 +146,7 @@ export default function MatchRecordPage() {
                         }
                     })
                 }
-                alert('기록 ?�패')
+                alert('기록 실패')
             }
         } catch (e) {
             console.error(e)
@@ -159,12 +161,12 @@ export default function MatchRecordPage() {
                     }
                 })
             }
-            alert('기록 ?�패')
+            alert('기록 실패')
         }
     }
 
     const deleteEvent = async (log: EventLog) => {
-        if (!confirm(`${log.playerName}??${log.type === 'GOAL' ? '�? : '?�수�?} 기록????��?�시겠습?�까?`)) return
+        if (!confirm(`${log.playerName}의 ${log.type === 'GOAL' ? '골' : '호수비'} 기록을 삭제하시겠습니까?`)) return
 
         // Remove from local logs
         setEventLogs(prev => prev.filter(e => e.id !== log.id))
@@ -209,12 +211,12 @@ export default function MatchRecordPage() {
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="text-slate-400">로딩 �?..</div>
+            <div className="text-slate-400">로딩 중...</div>
         </div>
     )
     if (!match) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="text-slate-400">경기�?찾을 ???�습?�다.</div>
+            <div className="text-slate-400">경기를 찾을 수 없습니다.</div>
         </div>
     )
 
@@ -224,7 +226,7 @@ export default function MatchRecordPage() {
             <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
                 <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
                     <button
-                        onClick={() => navigate(`/sessions/${sessionId}`)}
+                        onClick={() => navigate(`/sessions/${sessionId}?tab=scoreboard`)}
                         className="p-2 hover:bg-slate-100 rounded-full transition-colors"
                     >
                         <ArrowLeft size={20} className="text-slate-600" />
@@ -259,14 +261,14 @@ export default function MatchRecordPage() {
                     <div className="flex items-center justify-between">
                         <div className="flex-1 text-center">
                             <div className="text-5xl font-black tabular-nums">{match.team1_score ?? 0}</div>
-                            <div className="text-xs text-slate-400 mt-1 font-medium">{team1?.name}</div>
+                            <div className="text-xs text-slate-400 mt-1 font-medium truncate max-w-[120px] mx-auto">{team1?.name}</div>
                         </div>
                         <div className="px-4">
                             <span className="text-2xl font-bold text-slate-500">vs</span>
                         </div>
                         <div className="flex-1 text-center">
                             <div className="text-5xl font-black tabular-nums">{match.team2_score ?? 0}</div>
-                            <div className="text-xs text-slate-400 mt-1 font-medium">{team2?.name}</div>
+                            <div className="text-xs text-slate-400 mt-1 font-medium truncate max-w-[120px] mx-auto">{team2?.name}</div>
                         </div>
                     </div>
                 </div>
@@ -279,19 +281,19 @@ export default function MatchRecordPage() {
                         actionMode === 'assist' && "bg-amber-500 text-white",
                         actionMode === 'defense' && "bg-violet-500 text-white"
                     )}>
-                        {actionMode === 'goal' && "???�점?��? ?�택?�세??}
+                        {actionMode === 'goal' && "⚽ 득점자를 선택하세요"}
                         {actionMode === 'assist' && (
                             <div className="flex items-center justify-center gap-2 flex-wrap">
-                                <span>?���?{pendingGoal?.scorerName} �????�시?�트?</span>
+                                <span>🅰️ {pendingGoal?.scorerName} 골 → 어시스트?</span>
                                 <button
                                     onClick={handleGoalWithoutAssist}
                                     className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-xs"
                                 >
-                                    ?�음
+                                    없음
                                 </button>
                             </div>
                         )}
-                        {actionMode === 'defense' && "?���??�수�??�수�??�택?�세??}
+                        {actionMode === 'defense' && "🛡️ 호수비 선수를 선택하세요"}
                     </div>
                 )}
 
@@ -301,7 +303,7 @@ export default function MatchRecordPage() {
                     <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
                         <div className="flex items-center gap-2 mb-3">
                             <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                            <h3 className="font-bold text-slate-800 text-xs">{team1?.name}</h3>
+                            <h3 className="font-bold text-slate-800 text-xs truncate flex-1">{team1?.name}</h3>
                         </div>
                         <div className="space-y-1.5">
                             {team1?.players?.map(p => (
@@ -317,7 +319,7 @@ export default function MatchRecordPage() {
                                         pendingGoal?.scorerId === p.id && "ring-2 ring-amber-400 bg-amber-50"
                                     )}
                                 >
-                                    {p.name}
+                                    <span className="truncate">{p.name}</span>
                                 </button>
                             ))}
                         </div>
@@ -327,7 +329,7 @@ export default function MatchRecordPage() {
                     <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
                         <div className="flex items-center gap-2 mb-3">
                             <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                            <h3 className="font-bold text-slate-800 text-xs">{team2?.name}</h3>
+                            <h3 className="font-bold text-slate-800 text-xs truncate flex-1">{team2?.name}</h3>
                         </div>
                         <div className="space-y-1.5">
                             {team2?.players?.map(p => (
@@ -343,7 +345,7 @@ export default function MatchRecordPage() {
                                         pendingGoal?.scorerId === p.id && "ring-2 ring-amber-400 bg-amber-50"
                                     )}
                                 >
-                                    {p.name}
+                                    <span className="truncate">{p.name}</span>
                                 </button>
                             ))}
                         </div>
@@ -354,17 +356,17 @@ export default function MatchRecordPage() {
                 {eventLogs.length > 0 && (
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-                            ?�� 기록 로그
+                            📋 기록 로그
                         </h3>
                         <div className="space-y-2 max-h-48 overflow-y-auto">
                             {eventLogs.map(log => (
-                                <div key={log.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-slate-400 font-mono text-xs">{formatTime(log.time)}</span>
-                                        <span className="font-medium text-slate-800">{log.playerName}</span>
-                                        <span>{log.type === 'GOAL' ? '?? : '?���?}</span>
+                                <div key={log.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-sm gap-2">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span className="text-slate-400 font-mono text-xs flex-shrink-0">{formatTime(log.time)}</span>
+                                        <span className="font-medium text-slate-800 truncate">{log.playerName}</span>
+                                        <span className="flex-shrink-0">{log.type === 'GOAL' ? '⚽' : '🛡️'}</span>
                                         {log.assisterName && (
-                                            <span className="text-slate-500 text-xs">??{log.assisterName}</span>
+                                            <span className="text-slate-500 text-xs truncate">← {log.assisterName}</span>
                                         )}
                                     </div>
                                     <button
@@ -395,7 +397,7 @@ export default function MatchRecordPage() {
                                 : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
                         )}
                     >
-                        <span className="text-lg">??/span> �?기록
+                        <span className="text-lg">⚽</span> 골 기록
                     </button>
                     <button
                         onClick={() => {
@@ -409,12 +411,18 @@ export default function MatchRecordPage() {
                                 : "bg-violet-100 text-violet-700 hover:bg-violet-200"
                         )}
                     >
-                        <span className="text-lg">?���?/span> ?�수�?
+                        <span className="text-lg">🛡️</span> 호수비
                     </button>
                 </div>
+
+                {/* Save Button */}
+                <button
+                    onClick={() => navigate(`/sessions/${sessionId}?tab=scoreboard`)}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-lg shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all"
+                >
+                    ✅ 경기 저장 완료
+                </button>
             </div>
         </div>
     )
 }
-
-

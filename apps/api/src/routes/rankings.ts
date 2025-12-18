@@ -20,6 +20,8 @@ interface PlayerStats {
     points: number
     ppm: number
     winRate: number
+    attendance: number
+    streak: number
 }
 
 // Helper to calculate all stats
@@ -43,7 +45,9 @@ const calculateRankings = async (DB: D1Database) => {
             wins: 0,
             points: 0,
             ppm: 0,
-            winRate: 0
+            winRate: 0,
+            attendance: 0,
+            streak: 0
         }
     })
 
@@ -111,16 +115,12 @@ const calculateRankings = async (DB: D1Database) => {
                 teamMembers[m.team2_id].forEach(pid => { if (playerMap[pid]) playerMap[pid].games++ })
             }
 
-            // Points & Wins
+            // Points (for session ranking, not individual wins)
             if (s1 > s2) {
                 teamPoints[m.team1_id].points += 3
-                // Track Wins
-                teamMembers[m.team1_id]?.forEach(pid => { if (playerMap[pid]) playerMap[pid].wins++ })
             }
             else if (s2 > s1) {
                 teamPoints[m.team2_id].points += 3
-                // Track Wins
-                teamMembers[m.team2_id]?.forEach(pid => { if (playerMap[pid]) playerMap[pid].wins++ })
             }
             else {
                 teamPoints[m.team1_id].points += 1
@@ -148,17 +148,170 @@ const calculateRankings = async (DB: D1Database) => {
 
     // 4. Derived Metrics
     Object.values(playerMap).forEach(p => {
+        // 다승왕 = 세션 1등 횟수
+        p.wins = p.rank1
+
         if (p.games > 0) {
             p.ppm = Number((p.points / p.games).toFixed(2))
             p.winRate = Number(((p.wins / p.games) * 100).toFixed(1))
         }
     })
 
-    // WAIT. I removed matchWins counting.
-    // I should re-add it inside the match loop to support "Win Rate".
-    // I will refactor the above loop slightly.
+    // 5. Attendance & Streak Calculation
+    // Get all attendance records grouped by player
+    const attendanceRes = await DB.prepare('SELECT player_id, COUNT(*) as count FROM attendance GROUP BY player_id').all<{ player_id: number, count: number }>()
+    attendanceRes.results?.forEach(a => {
+        if (playerMap[a.player_id]) {
+            playerMap[a.player_id].attendance = a.count
+        }
+    })
+
+    // Calculate streak for each player
+    const allSessions = await DB.prepare('SELECT id FROM sessions ORDER BY session_date ASC').all<{ id: number }>()
+    const sessionIds = allSessions.results?.map(s => s.id) || []
+
+    for (const p of Object.values(playerMap)) {
+        const playerAttendance = await DB.prepare('SELECT session_id FROM attendance WHERE player_id = ?').bind(p.id).all<{ session_id: number }>()
+        const attendedSet = new Set(playerAttendance.results?.map(a => a.session_id))
+
+        let currentStreak = 0
+        let maxStreak = 0
+        for (const sid of sessionIds) {
+            if (attendedSet.has(sid)) {
+                currentStreak++
+                maxStreak = Math.max(maxStreak, currentStreak)
+            } else {
+                currentStreak = 0
+            }
+        }
+        p.streak = maxStreak
+    }
+
     return Object.values(playerMap)
 }
+
+// GET Hall of Fame (Season TOP 3)
+rankings.get('/hall-of-fame', async (c) => {
+    const year = c.req.query('year') || new Date().getFullYear().toString()
+    const yearNum = parseInt(year)
+
+    try {
+        // Get all sessions for this year
+        const sessionsRes = await c.env.DB.prepare(`
+            SELECT id FROM sessions 
+            WHERE session_date LIKE ?
+        `).bind(`${yearNum}-%`).all<{ id: number }>()
+
+        const sessionIds = sessionsRes.results?.map(s => s.id) || []
+
+        if (sessionIds.length === 0) {
+            // Return empty data for year with no sessions
+            return c.json({
+                goals: { entries: [] },
+                assists: { entries: [] },
+                wins: { entries: [] },
+                attendance: { entries: [] }
+            })
+        }
+
+        // Get stats for sessions in this year
+        const placeholders = sessionIds.map(() => '?').join(',')
+
+        // Goals ranking
+        const goalsRes = await c.env.DB.prepare(`
+            SELECT p.name as player_name, SUM(pms.goals) as value
+            FROM player_match_stats pms
+            JOIN matches m ON m.id = pms.match_id
+            JOIN players p ON p.id = pms.player_id
+            WHERE m.session_id IN (${placeholders})
+            GROUP BY pms.player_id
+            ORDER BY value DESC
+            LIMIT 3
+        `).bind(...sessionIds).all<{ player_name: string, value: number }>()
+
+        // Assists ranking
+        const assistsRes = await c.env.DB.prepare(`
+            SELECT p.name as player_name, SUM(pms.assists) as value
+            FROM player_match_stats pms
+            JOIN matches m ON m.id = pms.match_id
+            JOIN players p ON p.id = pms.player_id
+            WHERE m.session_id IN (${placeholders})
+            GROUP BY pms.player_id
+            ORDER BY value DESC
+            LIMIT 3
+        `).bind(...sessionIds).all<{ player_name: string, value: number }>()
+
+        // Attendance ranking for this year
+        const attendanceRes = await c.env.DB.prepare(`
+            SELECT p.name as player_name, COUNT(*) as value
+            FROM attendance a
+            JOIN players p ON p.id = a.player_id
+            WHERE a.session_id IN (${placeholders})
+            GROUP BY a.player_id
+            ORDER BY value DESC
+            LIMIT 3
+        `).bind(...sessionIds).all<{ player_name: string, value: number }>()
+
+        // Wins (session 1st place) - more complex
+        // Calculate per-session rankings and count rank1
+        const allStats = await calculateRankings(c.env.DB)
+        const winsRanking = allStats
+            .filter(p => p.rank1 > 0)
+            .sort((a, b) => b.rank1 - a.rank1)
+            .slice(0, 3)
+            .map((p, i) => ({ player_name: p.name, value: p.rank1, rank: i + 1 }))
+
+        // Points ranking (Attack Points = Goals + Assists)
+        const pointsRanking = allStats
+            .filter(p => p.points > 0)
+            .sort((a, b) => b.points - a.points)
+            .slice(0, 3)
+            .map((p, i) => ({ player_name: p.name, value: p.points, rank: i + 1 }))
+
+        // Streak ranking (consecutive attendance)
+        const streakRanking = allStats
+            .filter(p => p.streak > 0)
+            .sort((a, b) => b.streak - a.streak)
+            .slice(0, 3)
+            .map((p, i) => ({ player_name: p.name, value: p.streak, rank: i + 1 }))
+
+        // Defenses ranking - need to query (if tracked)
+        // Note: defenses might not be stored per session, using allStats if available
+        const defensesRanking = allStats
+            .filter(p => (p as any).defenses > 0)
+            .sort((a, b) => ((b as any).defenses || 0) - ((a as any).defenses || 0))
+            .slice(0, 3)
+            .map((p, i) => ({ player_name: p.name, value: (p as any).defenses || 0, rank: i + 1 }))
+
+        return c.json({
+            goals: {
+                entries: (goalsRes.results || []).map((r, i) => ({ ...r, rank: i + 1, year: yearNum }))
+            },
+            assists: {
+                entries: (assistsRes.results || []).map((r, i) => ({ ...r, rank: i + 1, year: yearNum }))
+            },
+            points: {
+                entries: pointsRanking.map(r => ({ ...r, year: yearNum }))
+            },
+            wins: {
+                entries: winsRanking.map(r => ({ ...r, year: yearNum }))
+            },
+            defenses: {
+                entries: defensesRanking.map(r => ({ ...r, year: yearNum }))
+            },
+            attendance: {
+                entries: (attendanceRes.results || []).map((r, i) => ({ ...r, rank: i + 1, year: yearNum }))
+            },
+            streak: {
+                entries: streakRanking.map(r => ({ ...r, year: yearNum }))
+            }
+        })
+
+    } catch (e) {
+        console.error(e)
+        return c.json({ error: 'Failed to fetch hall of fame' }, 500)
+    }
+})
 
 // GET MVP & Synergy
 rankings.get('/mvp', async (c) => {
@@ -274,9 +427,9 @@ rankings.get('/mvp', async (c) => {
 })
 
 rankings.get('/:type', async (c) => {
-    const type = c.req.param('type') as 'goals' | 'assists' | 'points' | 'ppm' | 'winRate'
+    const type = c.req.param('type') as 'goals' | 'assists' | 'points' | 'ppm' | 'winRate' | 'attendance' | 'streak'
 
-    if (!['goals', 'assists', 'points', 'ppm', 'winRate'].includes(type)) {
+    if (!['goals', 'assists', 'points', 'ppm', 'winRate', 'wins', 'defenses', 'attendance', 'streak'].includes(type)) {
         return c.json({ error: 'Invalid ranking type' }, 400)
     }
 

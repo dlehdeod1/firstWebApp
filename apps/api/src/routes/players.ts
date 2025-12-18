@@ -106,7 +106,8 @@ players.put('/:id', async (c) => {
     const body = await c.req.json()
     const {
         name, player_code,
-        shooting, offball_run, ball_keeping, passing, intercept, marking, stamina, speed, physical
+        shooting, offball_run, ball_keeping, passing, intercept, marking, stamina, speed, physical, linkup,
+        birth_year, photo_url
     } = body
 
     try {
@@ -123,11 +124,15 @@ players.put('/:id', async (c) => {
                 stamina = COALESCE(?, stamina),
                 speed = COALESCE(?, speed),
                 physical = COALESCE(?, physical),
+                linkup = COALESCE(?, linkup),
+                birth_year = COALESCE(?, birth_year),
+                photo_url = COALESCE(?, photo_url),
                 updated_at = unixepoch()
             WHERE id = ?
         `).bind(
             name, player_code,
-            shooting, offball_run, ball_keeping, passing, intercept, marking, stamina, speed, physical,
+            shooting, offball_run, ball_keeping, passing, intercept, marking, stamina, speed, physical, linkup,
+            birth_year, photo_url,
             id
         ).run()
 

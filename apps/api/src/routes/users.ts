@@ -99,10 +99,10 @@ users.get('/me', async (c) => {
     const abilityHistory = await AbilityService.getHistory(c.env.DB, userId)
 
     // If no abilities initialized, maybe auto-init with defaults?
-    // Requirement says "Admin sets base", but for seamless UX let's init default 50 if missing.
+    // Season starts at 20 for all stats
     let finalAbilities = abilities
     if (!abilities) {
-        await AbilityService.initializeStats(c.env.DB, userId, { atk: 50, pm: 50, comp: 50, dil: 50 })
+        await AbilityService.initializeStats(c.env.DB, userId, { atk: 20, pm: 20, comp: 20, dil: 20 })
         finalAbilities = await AbilityService.getStats(c.env.DB, userId)
     }
 

@@ -420,9 +420,11 @@ sessions.get('/:id', async (c) => {
     // Teams
     const { results: teams } = await c.env.DB.prepare('SELECT * FROM teams WHERE session_id = ?').bind(id).all<any>()
 
-    // Team Members
+    // Team Members (include stats for power calculation)
     const { results: teamMembers } = await c.env.DB.prepare(`
-        SELECT tm.team_id, p.id, p.name 
+        SELECT tm.team_id, p.id, p.name, 
+               p.shooting, p.passing, p.stamina, p.speed, p.physical,
+               p.ball_keeping, p.intercept, p.marking, p.offball_run
         FROM team_members tm
         JOIN players p ON tm.player_id = p.id
         WHERE tm.team_id IN (SELECT id FROM teams WHERE session_id = ?)
@@ -475,6 +477,38 @@ sessions.put('/:id/attendance', async (c) => {
     }
 
     await c.env.DB.batch(batch)
+    return c.json({ success: true })
+})
+
+// DELETE Session (and all related data)
+sessions.delete('/:id', async (c) => {
+    const sessionId = c.req.param('id')
+
+    // Delete in order to respect foreign keys
+    // 1. Player match stats (depends on matches)
+    await c.env.DB.prepare(`
+        DELETE FROM player_match_stats 
+        WHERE match_id IN (SELECT id FROM matches WHERE session_id = ?)
+    `).bind(sessionId).run()
+
+    // 2. Matches
+    await c.env.DB.prepare('DELETE FROM matches WHERE session_id = ?').bind(sessionId).run()
+
+    // 3. Team members (depends on teams)
+    await c.env.DB.prepare(`
+        DELETE FROM team_members 
+        WHERE team_id IN (SELECT id FROM teams WHERE session_id = ?)
+    `).bind(sessionId).run()
+
+    // 4. Teams
+    await c.env.DB.prepare('DELETE FROM teams WHERE session_id = ?').bind(sessionId).run()
+
+    // 5. Attendance
+    await c.env.DB.prepare('DELETE FROM attendance WHERE session_id = ?').bind(sessionId).run()
+
+    // 6. Session
+    await c.env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run()
+
     return c.json({ success: true })
 })
 

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import MainLayout from '@/layouts/MainLayout'
 import Dashboard from '@/pages/Dashboard'
 import SessionList from '@/pages/sessions/SessionList'
@@ -10,6 +11,7 @@ import LoginPage from '@/pages/login/LoginPage'
 import SignupPage from '@/pages/login/SignupPage'
 import MePage from '@/pages/MePage'
 import RankingsPage from '@/pages/RankingsPage'
+import HallOfFamePage from '@/pages/HallOfFamePage'
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     const role = localStorage.getItem('user_role')
@@ -19,24 +21,27 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
     return (
-        <BrowserRouter>
-            <Routes>
-                <Route element={<MainLayout />}>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/signup" element={<SignupPage />} />
-                    <Route path="/sessions" element={<SessionList />} />
-                    <Route path="/sessions/:id" element={<SessionDetail />} />
-                    <Route path="/sessions/:id/match/:matchId/record" element={<MatchRecordPage />} />
-                    <Route path="/rankings" element={<RankingsPage />} />
-                    <Route path="/me" element={<MePage />} />
+        <ThemeProvider>
+            <BrowserRouter>
+                <Routes>
+                    <Route element={<MainLayout />}>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/signup" element={<SignupPage />} />
+                        <Route path="/sessions" element={<SessionList />} />
+                        <Route path="/sessions/:id" element={<SessionDetail />} />
+                        <Route path="/sessions/:id/match/:matchId/record" element={<MatchRecordPage />} />
+                        <Route path="/rankings" element={<RankingsPage />} />
+                        <Route path="/hall-of-fame" element={<HallOfFamePage />} />
+                        <Route path="/me" element={<MePage />} />
 
-                    {/* Admin Routes */}
-                    <Route path="/sessions/new" element={<AdminRoute><SessionNew /></AdminRoute>} />
-                    <Route path="/admin/players" element={<AdminRoute><PlayerEditor /></AdminRoute>} />
-                </Route>
-            </Routes>
-        </BrowserRouter>
+                        {/* Admin Routes */}
+                        <Route path="/sessions/new" element={<AdminRoute><SessionNew /></AdminRoute>} />
+                        <Route path="/admin/players" element={<AdminRoute><PlayerEditor /></AdminRoute>} />
+                    </Route>
+                </Routes>
+            </BrowserRouter>
+        </ThemeProvider>
     )
 }
 
