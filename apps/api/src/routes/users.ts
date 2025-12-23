@@ -126,7 +126,7 @@ users.patch('/me', async (c) => {
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
     const body = await c.req.json()
-    const { alias, phone, birth_date, height_cm, weight_kg } = body
+    const { alias, phone, birth_date, height_cm, weight_kg, photo_url } = body
 
     // Validation
     if (height_cm && (height_cm < 120 || height_cm > 220)) return c.json({ error: 'Height must be 120-220' }, 400)
@@ -148,6 +148,7 @@ users.patch('/me', async (c) => {
                 birth_date = COALESCE(?, birth_date),
                 height_cm = COALESCE(?, height_cm),
                 weight_kg = COALESCE(?, weight_kg),
+                photo_url = COALESCE(?, photo_url),
                 updated_at = unixepoch()
             WHERE user_id = ?
         `).bind(
@@ -156,20 +157,22 @@ users.patch('/me', async (c) => {
             birth_date ?? null,
             height_cm ?? null,
             weight_kg ?? null,
+            photo_url ?? null,
             userId
         ).run()
     } else {
         // Create
         await c.env.DB.prepare(`
-            INSERT INTO profiles(user_id, alias, phone, birth_date, height_cm, weight_kg, created_at, updated_at)
-            VALUES(?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
+            INSERT INTO profiles(user_id, alias, phone, birth_date, height_cm, weight_kg, photo_url, created_at, updated_at)
+            VALUES(?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
         `).bind(
             userId,
             alias ?? null,
             phone ?? null,
             birth_date ?? null,
             height_cm ?? null,
-            weight_kg ?? null
+            weight_kg ?? null,
+            photo_url ?? null
         ).run()
     }
 

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Users, Save, LogOut, Trophy, Award, Heart } from 'lucide-react'
+import { useTheme } from '@/contexts/ThemeContext'
+import { cn } from '@/lib/utils'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+const API_URL = import.meta.env.VITE_API_URL || 'https://conerkicks-api.conerkicks.workers.dev'
 
 interface Badge {
     code: string
@@ -53,6 +55,7 @@ interface UserProfile {
         age: number | null
         height_cm: number | null
         weight_kg: number | null
+        photo_url: string | null // Profile photo URL
     } | null
     player: any
     badges: Badge[]
@@ -85,6 +88,7 @@ const getMemberTier = (attendance: number): { name: string, icon: string, color:
 
 export default function MePage() {
     const navigate = useNavigate()
+    const { actualTheme } = useTheme()
     const [data, setData] = useState<UserProfile | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -95,7 +99,8 @@ export default function MePage() {
         phone: '',
         birth_date: '',
         height_cm: '' as string | number,
-        weight_kg: '' as string | number
+        weight_kg: '' as string | number,
+        photo_url: ''
     })
 
     // Chemistry Preferences State
@@ -125,7 +130,8 @@ export default function MePage() {
                     phone: resData.profile?.phone || '',
                     birth_date: resData.profile?.birth_date || '', // YYYY-MM-DD
                     height_cm: resData.profile?.height_cm || '',
-                    weight_kg: resData.profile?.weight_kg || ''
+                    weight_kg: resData.profile?.weight_kg || '',
+                    photo_url: resData.profile?.photo_url || ''
                 })
                 // Sync Role immediately
                 if (resData.user.role) {
@@ -238,7 +244,7 @@ export default function MePage() {
         })
     }
 
-    if (loading) return <div className="p-8 text-center text-slate-500">로딩 중...</div>
+    if (loading) return <div className={cn("p-8 text-center", actualTheme === 'dark' ? "text-slate-400" : "text-slate-500")}>로딩 중...</div>
 
     // Chart Data
     const chartData = data?.abilities ? [
@@ -256,13 +262,23 @@ export default function MePage() {
 
             <div className="space-y-6">
                 {/* 1. Basic Info */}
-                <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl">
-                        {data?.user.username?.charAt(0).toUpperCase()}
-                    </div>
+                <div className={cn("rounded-2xl p-6 border shadow-sm flex items-center gap-4",
+                    actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                )}>
+                    {data?.profile?.photo_url ? (
+                        <img
+                            src={data.profile.photo_url}
+                            alt="프로필"
+                            className="w-16 h-16 rounded-full object-cover border-2 border-blue-200"
+                        />
+                    ) : (
+                        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl">
+                            {data?.user.username?.charAt(0).toUpperCase()}
+                        </div>
+                    )}
                     <div className="flex-1">
-                        <div className="font-bold text-lg text-slate-900">{data?.profile?.alias || data?.user.username}</div>
-                        <div className="text-sm text-slate-500">@{data?.user.username}</div>
+                        <div className={cn("font-bold text-lg", actualTheme === 'dark' ? "text-slate-100" : "text-slate-900")}>{data?.profile?.alias || data?.user.username}</div>
+                        <div className={cn("text-sm", actualTheme === 'dark' ? "text-slate-400" : "text-slate-500")}>@{data?.user.username}</div>
                         <div className="flex flex-wrap gap-2 mt-1">
                             <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-bold">
                                 {['owner', 'OWNER'].includes(data?.user.role || '') ? '구단주' : (['admin', 'ADMIN'].includes(data?.user.role || '') ? '운영진' : '멤버')}
@@ -289,7 +305,9 @@ export default function MePage() {
                     // Case 1: No Player Linked -> Claim UI
                     if (!data?.player) {
                         return (
-                            <div className="bg-slate-800 text-white rounded-2xl p-6 border border-slate-700 shadow-sm">
+                            <div className={cn("rounded-2xl p-6 border shadow-sm",
+                                actualTheme === 'dark' ? "bg-slate-900 text-white border-slate-700" : "bg-slate-800 text-white border-slate-700"
+                            )}>
                                 <h2 className="font-bold text-lg mb-2 flex items-center gap-2">
                                     <Users size={20} className="text-yellow-400" />
                                     선수 연결하기
@@ -354,8 +372,12 @@ export default function MePage() {
                         <>
                             {/* Ability Radar Chart */}
                             {data?.abilities && (
-                                <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                    <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                                <div className={cn("rounded-2xl p-6 border shadow-sm",
+                                    actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                                )}>
+                                    <h2 className={cn("font-bold flex items-center gap-2 mb-4",
+                                        actualTheme === 'dark' ? "text-slate-100" : "text-slate-800"
+                                    )}>
                                         <Award size={18} className="text-purple-500" />
                                         시즌 퍼포먼스 분석
                                     </h2>
@@ -390,14 +412,18 @@ export default function MePage() {
                                             return (
                                                 <div
                                                     key={stat.subject}
-                                                    className="bg-slate-50 p-3 rounded-lg flex justify-between items-center cursor-help"
+                                                    className={cn("p-3 rounded-lg flex justify-between items-center cursor-help",
+                                                        actualTheme === 'dark' ? "bg-slate-900/50" : "bg-slate-50"
+                                                    )}
                                                     title={statDescriptions[stat.subject] || ''}
                                                 >
-                                                    <span className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                                                    <span className={cn("text-xs font-bold flex items-center gap-1",
+                                                        actualTheme === 'dark' ? "text-slate-400" : "text-slate-500"
+                                                    )}>
                                                         {stat.subject}
-                                                        <span className="text-slate-300 text-[10px]">ⓘ</span>
+                                                        <span className={cn("text-[10px]", actualTheme === 'dark' ? "text-slate-600" : "text-slate-300")}>ⓘ</span>
                                                     </span>
-                                                    <span className="text-lg font-black text-slate-800">{Math.round(stat.A)}</span>
+                                                    <span className={cn("text-lg font-black", actualTheme === 'dark' ? "text-slate-100" : "text-slate-800")}>{Math.round(stat.A)}</span>
                                                 </div>
                                             );
                                         })}
@@ -405,12 +431,12 @@ export default function MePage() {
 
                                     {/* Recent History */}
                                     {data.abilityHistory && data.abilityHistory.length > 0 && (
-                                        <div className="mt-6 border-t border-slate-100 pt-4">
-                                            <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">최근 변동 내역</h3>
+                                        <div className={cn("mt-6 border-t pt-4", actualTheme === 'dark' ? "border-slate-700" : "border-slate-100")}>
+                                            <h3 className={cn("text-xs font-bold uppercase mb-3", actualTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>최근 변동 내역</h3>
                                             <div className="space-y-2">
                                                 {data.abilityHistory.slice(0, 3).map(log => (
                                                     <div key={log.id} className="flex justify-between items-center text-sm">
-                                                        <span className="text-slate-600 flex items-center gap-2">
+                                                        <span className={cn("flex items-center gap-2", actualTheme === 'dark' ? "text-slate-400" : "text-slate-600")}>
                                                             <span className={`w-1.5 h-1.5 rounded-full ${log.delta > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
                                                             {log.reason}
                                                         </span>
@@ -427,8 +453,12 @@ export default function MePage() {
 
                             {/* Score & Records */}
                             {data?.records && (
-                                <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                    <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                                <div className={cn("rounded-2xl p-6 border shadow-sm",
+                                    actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                                )}>
+                                    <h2 className={cn("font-bold flex items-center gap-2 mb-4",
+                                        actualTheme === 'dark' ? "text-slate-100" : "text-slate-800"
+                                    )}>
                                         <Trophy size={18} className="text-yellow-500" />
                                         내 기록
                                     </h2>
@@ -456,10 +486,10 @@ export default function MePage() {
                                     {/* Secondary Stats */}
                                     <div className="grid grid-cols-2 gap-3 mb-4">
                                         {/* Win Rate */}
-                                        <div className="p-3 bg-slate-50 rounded-xl">
+                                        <div className={cn("p-3 rounded-xl", actualTheme === 'dark' ? "bg-slate-900/50" : "bg-slate-50")}>
                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs text-slate-500 font-bold">승률</span>
-                                                <span className="text-lg font-black text-slate-900">
+                                                <span className={cn("text-xs font-bold", actualTheme === 'dark' ? "text-slate-400" : "text-slate-500")}>승률</span>
+                                                <span className={cn("text-lg font-black", actualTheme === 'dark' ? "text-slate-100" : "text-slate-900")}>
                                                     {data.records.matchesPlayed > 0
                                                         ? Math.round((data.records.wins / data.records.matchesPlayed) * 100)
                                                         : 0}%
@@ -478,10 +508,10 @@ export default function MePage() {
                                         </div>
 
                                         {/* Goal per Match */}
-                                        <div className="p-3 bg-slate-50 rounded-xl">
+                                        <div className={cn("p-3 rounded-xl", actualTheme === 'dark' ? "bg-slate-900/50" : "bg-slate-50")}>
                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs text-slate-500 font-bold">경기당 득점</span>
-                                                <span className="text-lg font-black text-slate-900">
+                                                <span className={cn("text-xs font-bold", actualTheme === 'dark' ? "text-slate-400" : "text-slate-500")}>경기당 득점</span>
+                                                <span className={cn("text-lg font-black", actualTheme === 'dark' ? "text-slate-100" : "text-slate-900")}>
                                                     {data.records.matchesPlayed > 0
                                                         ? (data.records.goals / data.records.matchesPlayed).toFixed(2)
                                                         : '0.00'}
@@ -491,14 +521,16 @@ export default function MePage() {
                                     </div>
 
                                     {/* Detail Stats Grid */}
-                                    <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-center border-t border-slate-100 pt-4">
+                                    <div className={cn("grid grid-cols-3 md:grid-cols-6 gap-2 text-center border-t pt-4",
+                                        actualTheme === 'dark' ? "border-slate-700" : "border-slate-100"
+                                    )}>
                                         <div className="p-2">
-                                            <div className="text-xs text-slate-400 mb-1">경기</div>
-                                            <div className="font-bold text-slate-700">{data.records.matchesPlayed || 0}</div>
+                                            <div className={cn("text-xs mb-1", actualTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>경기</div>
+                                            <div className={cn("font-bold", actualTheme === 'dark' ? "text-slate-300" : "text-slate-700")}>{data.records.matchesPlayed || 0}</div>
                                         </div>
                                         <div className="p-2">
-                                            <div className="text-xs text-slate-400 mb-1">출석</div>
-                                            <div className="font-bold text-slate-700">{data.records.attendance}</div>
+                                            <div className={cn("text-xs mb-1", actualTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>출석</div>
+                                            <div className={cn("font-bold", actualTheme === 'dark' ? "text-slate-300" : "text-slate-700")}>{data.records.attendance}</div>
                                         </div>
                                         <div className="p-2">
                                             <div className="text-xs text-slate-400 mb-1">1위</div>
@@ -532,8 +564,12 @@ export default function MePage() {
                             )}
 
                             {/* Badges */}
-                            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                            <div className={cn("rounded-2xl p-6 border shadow-sm",
+                                actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                            )}>
+                                <h2 className={cn("font-bold flex items-center gap-2 mb-4",
+                                    actualTheme === 'dark' ? "text-slate-100" : "text-slate-800"
+                                )}>
                                     <Award size={18} className="text-blue-500" />
                                     획득 뱃지 ({data?.badges?.length || 0})
                                 </h2>
@@ -558,8 +594,12 @@ export default function MePage() {
 
                             {/* Favorite Players (Chemistry Preferences) */}
                             {data?.player && allPlayers.length > 0 && (
-                                <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                    <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-2">
+                                <div className={cn("rounded-2xl p-6 border shadow-sm",
+                                    actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                                )}>
+                                    <h2 className={cn("font-bold flex items-center gap-2 mb-2",
+                                        actualTheme === 'dark' ? "text-slate-100" : "text-slate-800"
+                                    )}>
                                         <Heart size={18} className="text-pink-500" />
                                         좋아하는 선수
                                     </h2>
@@ -612,16 +652,44 @@ export default function MePage() {
                     )
                 })()}
 
-                <form onSubmit={handleSave} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
-                    <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <form onSubmit={handleSave} className={cn("rounded-2xl p-6 border shadow-sm space-y-4",
+                    actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                )}>
+                    <h2 className={cn("font-bold flex items-center gap-2",
+                        actualTheme === 'dark' ? "text-slate-100" : "text-slate-800"
+                    )}>
                         <User size={18} className="text-slate-400" />
                         프로필 편집
                     </h2>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">닉네임 (Alias)</label>
+                        <label className={cn("block text-sm font-bold mb-1",
+                            actualTheme === 'dark' ? "text-slate-300" : "text-slate-700"
+                        )}>프로필 사진 URL</label>
+                        <div className="flex gap-3 items-center">
+                            {form.photo_url && (
+                                <img src={form.photo_url} alt="미리보기" className="w-12 h-12 rounded-full object-cover border-2 border-blue-200" />
+                            )}
+                            <input
+                                className={cn("flex-1 p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none text-sm",
+                                    actualTheme === 'dark' ? "bg-slate-900/50 border-slate-700 text-slate-100" : "bg-slate-50 border-slate-100"
+                                )}
+                                value={form.photo_url}
+                                onChange={(e) => setForm({ ...form, photo_url: e.target.value })}
+                                placeholder="https://example.com/photo.jpg"
+                            />
+                        </div>
+                        <p className={cn("text-xs mt-1", actualTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>구글 드라이브, 카카오톡 프로필 등 외부 이미지 URL을 입력하세요</p>
+                    </div>
+
+                    <div>
+                        <label className={cn("block text-sm font-bold mb-1",
+                            actualTheme === 'dark' ? "text-slate-300" : "text-slate-700"
+                        )}>닉네임 (Alias)</label>
                         <input
-                            className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                            className={cn("w-full p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none font-bold",
+                                actualTheme === 'dark' ? "bg-slate-900/50 border-slate-700 text-slate-100" : "bg-slate-50 border-slate-100"
+                            )}
                             value={form.alias}
                             onChange={(e) => setForm({ ...form, alias: e.target.value })}
                             placeholder="닉네임을 입력하세요"
@@ -629,10 +697,14 @@ export default function MePage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">연락처</label>
+                        <label className={cn("block text-sm font-bold mb-1",
+                            actualTheme === 'dark' ? "text-slate-300" : "text-slate-700"
+                        )}>연락처</label>
                         <input
                             type="tel"
-                            className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                            className={cn("w-full p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none font-bold",
+                                actualTheme === 'dark' ? "bg-slate-900/50 border-slate-700 text-slate-100" : "bg-slate-50 border-slate-100"
+                            )}
                             value={form.phone}
                             onChange={(e) => setForm({ ...form, phone: e.target.value })}
                             placeholder="010-0000-0000"
@@ -641,29 +713,41 @@ export default function MePage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">생년월일</label>
+                            <label className={cn("block text-sm font-bold mb-1",
+                                actualTheme === 'dark' ? "text-slate-300" : "text-slate-700"
+                            )}>생년월일</label>
                             <input
                                 type="date"
-                                className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal"
+                                className={cn("w-full p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal",
+                                    actualTheme === 'dark' ? "bg-slate-900/50 border-slate-700 text-slate-100" : "bg-slate-50 border-slate-100"
+                                )}
                                 value={form.birth_date}
                                 onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">키 (cm)</label>
+                            <label className={cn("block text-sm font-bold mb-1",
+                                actualTheme === 'dark' ? "text-slate-300" : "text-slate-700"
+                            )}>키 (cm)</label>
                             <input
                                 type="number"
-                                className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal"
+                                className={cn("w-full p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal",
+                                    actualTheme === 'dark' ? "bg-slate-900/50 border-slate-700 text-slate-100" : "bg-slate-50 border-slate-100"
+                                )}
                                 value={form.height_cm}
                                 onChange={(e) => setForm({ ...form, height_cm: e.target.value })}
                                 placeholder="175"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">몸무게 (kg)</label>
+                            <label className={cn("block text-sm font-bold mb-1",
+                                actualTheme === 'dark' ? "text-slate-300" : "text-slate-700"
+                            )}>몸무게 (kg)</label>
                             <input
                                 type="number"
-                                className="w-full p-3 bg-slate-50 rounded-xl border border-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal"
+                                className={cn("w-full p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none font-bold placeholder:font-normal",
+                                    actualTheme === 'dark' ? "bg-slate-900/50 border-slate-700 text-slate-100" : "bg-slate-50 border-slate-100"
+                                )}
                                 value={form.weight_kg}
                                 onChange={(e) => setForm({ ...form, weight_kg: e.target.value })}
                                 placeholder="70"

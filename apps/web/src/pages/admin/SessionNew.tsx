@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { Save, RefreshCw, Wand2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+const API_URL = import.meta.env.VITE_API_URL || 'https://conerkicks-api.conerkicks.workers.dev';
 
 interface ParsedResult {
     date: string;
+    title?: string;
+    location?: string;
     count: number;
     matched: any[];
     unknown: string[];
+    attendees?: string[];
 }
 
 export default function SessionNew() {
@@ -35,7 +38,38 @@ export default function SessionNew() {
 
     const handleSave = async () => {
         if (!result) return;
-        alert('Saving is not implemented in this demo yet.');
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            // Extract player IDs from matched players
+            const player_ids = result.matched.map((p: any) => p.id);
+
+            const res = await fetch(`${API_URL}/sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    date: result.date,
+                    title: '코너킥스 정기 풋살',
+                    pot_total: 0,
+                    base_fee: 10000,
+                    player_ids
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert('일정이 생성되었습니다!');
+                window.location.href = `/sessions/${data.id}`;
+            } else {
+                const err = await res.json();
+                alert('저장 실패: ' + (err.error || '알 수 없는 오류'));
+            }
+        } catch (e) {
+            alert('저장 중 오류 발생: ' + e);
+        }
     };
 
     return (

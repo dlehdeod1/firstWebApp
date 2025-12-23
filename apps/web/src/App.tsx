@@ -12,11 +12,20 @@ import SignupPage from '@/pages/login/SignupPage'
 import MePage from '@/pages/MePage'
 import RankingsPage from '@/pages/RankingsPage'
 import HallOfFamePage from '@/pages/HallOfFamePage'
+import RatingsPage from '@/pages/RatingsPage'
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     const role = localStorage.getItem('user_role')
     const isAdmin = ['ADMIN', 'OWNER', 'admin', 'owner'].includes(role || '')
     return isAdmin ? <>{children}</> : <div className="p-20 text-center">접근 권한이 없습니다. (구단주 또는 관리자 로그인 필요)</div>
+}
+
+// AuthRoute - any logged-in user (not GUEST) can access
+const AuthRoute = ({ children }: { children: React.ReactNode }) => {
+    const token = localStorage.getItem('auth_token')
+    const role = localStorage.getItem('user_role')
+    const isLoggedIn = !!token && role !== 'GUEST'
+    return isLoggedIn ? <>{children}</> : <div className="p-20 text-center">로그인이 필요합니다.</div>
 }
 
 function App() {
@@ -37,7 +46,8 @@ function App() {
 
                         {/* Admin Routes */}
                         <Route path="/sessions/new" element={<AdminRoute><SessionNew /></AdminRoute>} />
-                        <Route path="/admin/players" element={<AdminRoute><PlayerEditor /></AdminRoute>} />
+                        <Route path="/admin/players" element={<AuthRoute><PlayerEditor /></AuthRoute>} />
+                        <Route path="/ratings" element={<RatingsPage />} />
                     </Route>
                 </Routes>
             </BrowserRouter>

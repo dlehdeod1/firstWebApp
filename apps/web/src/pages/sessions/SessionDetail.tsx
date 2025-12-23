@@ -1,25 +1,37 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { MapPin, Users, ClipboardList, Shield, Activity, Lock, Wand2, RefreshCw, Download } from 'lucide-react'
+import { MapPin, Users, ClipboardList, Shield, Activity, Lock, Wand2, RefreshCw, Download, Share2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import html2canvas from 'html2canvas'
+import ShareCard from '@/components/ShareCard'
+import RatingModal from '@/components/RatingModal'
+import { useTheme } from '@/contexts/ThemeContext'
 
 // Define API Base URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+const API_URL = import.meta.env.VITE_API_URL || 'https://conerkicks-api.conerkicks.workers.dev'
 
 function TabOverview({ players, status }: { players: any[], status: string }) {
+    const { actualTheme } = useTheme()
     return (
-        <div id="capture-area-overview" className="space-y-6 bg-white p-4 rounded-xl">
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+        <div id="capture-area-overview" className={cn("space-y-6 p-4 rounded-xl",
+            actualTheme === 'dark' ? "bg-slate-800" : "bg-white"
+        )}>
+            <div className={cn("p-6 rounded-2xl border shadow-sm",
+                actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+            )}>
+                <h3 className={cn("font-bold text-lg mb-4 flex items-center gap-2",
+                    actualTheme === 'dark' ? "text-slate-100" : "text-slate-900"
+                )}>
                     <Users className="text-blue-600" size={20} /> 참석자 명단 ({players.length}명)
                 </h3>
                 {players.length === 0 ? (
-                    <p className="text-slate-400 text-sm">참석자가 아직 없습니다. 관리자가 명단을 업데이트할 때까지 기다려주세요.</p>
+                    <p className={cn("text-sm", actualTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>참석자가 아직 없습니다. 관리자가 명단을 업데이트할 때까지 기다려주세요.</p>
                 ) : (
                     <div className="flex flex-wrap gap-2">
                         {players.map((p, i) => (
-                            <span key={i} className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-lg text-sm font-medium border border-slate-100">
+                            <span key={i} className={cn("px-3 py-1.5 rounded-lg text-sm font-medium border",
+                                actualTheme === 'dark' ? "bg-slate-900/50 text-slate-300 border-slate-700" : "bg-slate-50 text-slate-700 border-slate-100"
+                            )}>
                                 {p.name}
                             </span>
                         ))}
@@ -27,9 +39,15 @@ function TabOverview({ players, status }: { players: any[], status: string }) {
                 )}
             </div>
 
-            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-                <h3 className="font-bold text-blue-900 mb-2">상태: {status === 'recruiting' ? '모집 중' : status === 'closed' ? '마감됨' : '종료됨'}</h3>
-                <p className="text-blue-700 text-sm leading-relaxed">
+            <div className={cn("p-6 rounded-2xl border",
+                actualTheme === 'dark' ? "bg-blue-900/30 border-blue-800/50" : "bg-blue-50 border-blue-100"
+            )}>
+                <h3 className={cn("font-bold mb-2",
+                    actualTheme === 'dark' ? "text-blue-300" : "text-blue-900"
+                )}>상태: {status === 'recruiting' ? '모집 중' : status === 'closed' ? '마감됨' : '종료됨'}</h3>
+                <p className={cn("text-sm leading-relaxed",
+                    actualTheme === 'dark' ? "text-blue-200" : "text-blue-700"
+                )}>
                     {status === 'recruiting'
                         ? '현재 참석자를 파악 중입니다. 투표가 마감되면 팀 구성이 시작됩니다.'
                         : '참석 확인이 완료되었습니다. 팀 구성을 확인해주세요.'}
@@ -39,7 +57,7 @@ function TabOverview({ players, status }: { players: any[], status: string }) {
     )
 }
 
-// Calculate team power analysis
+// Calculate team power analysis (0-100 scale)
 function calculateTeamPower(teamPlayers: any[]) {
     if (!teamPlayers || teamPlayers.length === 0) return null
 
@@ -55,27 +73,57 @@ function calculateTeamPower(teamPlayers: any[]) {
     teamPlayers.forEach((p: any) => {
         // Check if player has stats
         if (p.shooting !== undefined) {
-            stats.attack += (p.shooting || 5) + (p.offball_run || 5)
-            stats.defense += (p.intercept || 5) + (p.marking || 5)
-            stats.midfield += (p.passing || 5) + (p.ball_keeping || 5)
-            stats.physical += (p.stamina || 5) + (p.speed || 5) + (p.physical || 5)
+            stats.attack += (p.shooting || 50) + (p.offball_run || 50)
+            stats.defense += (p.intercept || 50) + (p.marking || 50)
+            stats.midfield += (p.passing || 50) + (p.ball_keeping || 50)
+            stats.physical += (p.stamina || 50) + (p.speed || 50) + (p.physical || 50)
             validPlayers++
         }
     })
 
     if (validPlayers === 0) return null
 
-    // Average per player, then scale to 100
-    stats.attack = Math.round((stats.attack / validPlayers / 20) * 100)
-    stats.defense = Math.round((stats.defense / validPlayers / 20) * 100)
-    stats.midfield = Math.round((stats.midfield / validPlayers / 20) * 100)
-    stats.physical = Math.round((stats.physical / validPlayers / 30) * 100)
+    // Average per player, divided by max possible (2 stats at 100 each = 200, 3 stats = 300)
+    stats.attack = Math.round((stats.attack / validPlayers / 200) * 100)
+    stats.defense = Math.round((stats.defense / validPlayers / 200) * 100)
+    stats.midfield = Math.round((stats.midfield / validPlayers / 200) * 100)
+    stats.physical = Math.round((stats.physical / validPlayers / 300) * 100)
     stats.overall = Math.round((stats.attack + stats.defense + stats.midfield + stats.physical) / 4)
 
     return stats
 }
 
-function TabTeams({ teams, players, onAssign, isAdmin, sessionId: _sessionId }: { teams: any[], players: any[], onAssign: (pid: number, tid: number | null) => void, isAdmin: boolean, sessionId: string }) {
+// Determine player position based on stats
+function getPlayerPosition(player: any): { position: 'FW' | 'MF' | 'DF', color: string, emoji: string } {
+    if (!player || player.shooting === undefined) {
+        return { position: 'MF', color: 'bg-yellow-100 text-yellow-800', emoji: '🔶' } // Default
+    }
+
+    const attackScore = (player.shooting || 5) + (player.offball_run || 5)
+    const midScore = (player.passing || 5) + (player.ball_keeping || 5)
+    const defScore = (player.intercept || 5) + (player.marking || 5)
+
+    if (attackScore >= midScore && attackScore >= defScore) {
+        return { position: 'FW', color: 'bg-red-100 text-red-700', emoji: '⚡' }
+    } else if (defScore >= midScore && defScore >= attackScore) {
+        return { position: 'DF', color: 'bg-blue-100 text-blue-700', emoji: '🛡️' }
+    } else {
+        return { position: 'MF', color: 'bg-yellow-100 text-yellow-800', emoji: '🔶' }
+    }
+}
+
+function TabTeams({ teams, players, onAssign, isAdmin, sessionId, onUpdateTeamName }: {
+    teams: any[],
+    players: any[],
+    onAssign: (pid: number, tid: number | null) => void,
+    isAdmin: boolean,
+    sessionId: string,
+    onUpdateTeamName?: (teamId: number, name: string) => void
+}) {
+    const [editingTeamId, setEditingTeamId] = useState<number | null>(null)
+    const [editingName, setEditingName] = useState('')
+    const [ratingPlayer, setRatingPlayer] = useState<{ id: number, name: string } | null>(null)
+
     // 1. Find Unassigned Players
     // Get all player IDs in teams
     const assignedIds = new Set<number>()
@@ -100,6 +148,24 @@ function TabTeams({ teams, players, onAssign, isAdmin, sessionId: _sessionId }: 
         } catch {
             return null
         }
+    }
+
+    const handleStartEdit = (team: any) => {
+        setEditingTeamId(team.id)
+        setEditingName(team.name)
+    }
+
+    const handleSaveEdit = () => {
+        if (editingTeamId && editingName.trim() && onUpdateTeamName) {
+            onUpdateTeamName(editingTeamId, editingName.trim())
+        }
+        setEditingTeamId(null)
+        setEditingName('')
+    }
+
+    const handleCancelEdit = () => {
+        setEditingTeamId(null)
+        setEditingName('')
     }
 
     return (
@@ -134,12 +200,51 @@ function TabTeams({ teams, players, onAssign, isAdmin, sessionId: _sessionId }: 
                 )}
             </div>
 
+            {/* AI Analysis Button */}
+            {isAdmin && teams.length > 0 && (
+                <div className="flex justify-center">
+                    <button
+                        onClick={async () => {
+                            const token = localStorage.getItem('auth_token')
+                            if (!token) return alert('로그인이 필요합니다')
+
+                            if (!confirm('현재 팀 구성을 AI로 분석하시겠습니까?')) return
+
+                            try {
+                                const res = await fetch(`${API_URL}/sessions/${sessionId}/analyze-teams`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                    }
+                                })
+
+                                if (res.ok) {
+                                    alert('팀 분석이 완료되었습니다! 페이지를 새로고침합니다.')
+                                    window.location.reload()
+                                } else {
+                                    const err = await res.json()
+                                    alert(`분석 실패: ${err.error || '알 수 없는 오류'}`)
+                                }
+                            } catch (e: any) {
+                                alert(`분석 실패: ${e?.message || '네트워크 오류'}`)
+                            }
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-purple-500/30 transition-all"
+                    >
+                        <span className="text-lg">🤖</span>
+                        AI 팀 분석
+                    </button>
+                </div>
+            )}
+
             {/* Teams Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {teams.map((team, idx) => {
                     const style = colors[idx % colors.length]
                     const power = calculateTeamPower(team.players)
                     const teamAi = getTeamAi(team)
+                    const isEditing = editingTeamId === team.id
                     return (
                         <div key={team.id} className={cn("p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md", style.bg, style.border)}>
                             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/50">
@@ -147,8 +252,37 @@ function TabTeams({ teams, players, onAssign, isAdmin, sessionId: _sessionId }: 
                                     {teamAi?.emoji || team.name?.[0]}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className={cn("font-bold text-lg truncate", style.text)}>{team.name}</h3>
-                                    {teamAi && (
+                                    {isEditing ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={editingName}
+                                                onChange={(e) => setEditingName(e.target.value)}
+                                                className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm font-bold"
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleSaveEdit()
+                                                    if (e.key === 'Escape') handleCancelEdit()
+                                                }}
+                                            />
+                                            <button onClick={handleSaveEdit} className="text-emerald-600 hover:text-emerald-700 text-xs font-bold">✓</button>
+                                            <button onClick={handleCancelEdit} className="text-slate-400 hover:text-slate-600 text-xs font-bold">✕</button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <h3 className={cn("font-bold text-lg truncate", style.text)}>{team.name}</h3>
+                                            {isAdmin && onUpdateTeamName && (
+                                                <button
+                                                    onClick={() => handleStartEdit(team)}
+                                                    className="text-slate-400 hover:text-slate-600 text-xs opacity-60 hover:opacity-100"
+                                                    title="팀명 수정"
+                                                >
+                                                    ✏️
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                    {teamAi && !isEditing && (
                                         <span className="text-xs font-medium text-slate-500">{teamAi.type}</span>
                                     )}
                                 </div>
@@ -206,30 +340,43 @@ function TabTeams({ teams, players, onAssign, isAdmin, sessionId: _sessionId }: 
 
                             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                                 {team.players && team.players.length > 0 ? (
-                                    team.players.map((m: any) => (
-                                        <div key={m.id} className="flex items-center justify-between p-2 rounded-lg bg-white/60 hover:bg-white/80 transition-colors group">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-1.5 h-1.5 rounded-full", style.badge)}></div>
-                                                <span className="text-sm font-medium text-slate-700">{m.name}</span>
-                                            </div>
-                                            {isAdmin && (
-                                                <select
-                                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white border border-slate-200 rounded p-0.5 outline-none max-w-[70px] cursor-pointer"
-                                                    onChange={(e) => {
-                                                        const val = e.target.value
-                                                        onAssign(m.id, val === 'unassign' ? null : Number(val))
-                                                    }}
-                                                    value={team.id}
+                                    team.players.map((m: any) => {
+                                        const pos = getPlayerPosition(m)
+                                        return (
+                                            <div key={m.id} className="flex items-center justify-between p-2 rounded-lg bg-white/60 hover:bg-white/80 transition-colors group">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-1.5 h-1.5 rounded-full", style.badge)}></div>
+                                                    <span className="text-sm font-medium text-slate-700">{m.name}</span>
+                                                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded", pos.color)}>
+                                                        {pos.position}
+                                                    </span>
+                                                </div>
+                                                {isAdmin && (
+                                                    <select
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white border border-slate-200 rounded p-0.5 outline-none max-w-[70px] cursor-pointer"
+                                                        onChange={(e) => {
+                                                            const val = e.target.value
+                                                            onAssign(m.id, val === 'unassign' ? null : Number(val))
+                                                        }}
+                                                        value={team.id}
+                                                    >
+                                                        <option value={team.id} disabled>이동</option>
+                                                        <option value="unassign">미배정</option>
+                                                        {teams.filter((t: any) => t.id !== team.id).map((t: any) => (
+                                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                                <button
+                                                    onClick={() => setRatingPlayer({ id: m.id, name: m.name })}
+                                                    className="p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded transition-colors"
+                                                    title="선수 평가"
                                                 >
-                                                    <option value={team.id} disabled>이동</option>
-                                                    <option value="unassign">미배정</option>
-                                                    {teams.filter((t: any) => t.id !== team.id).map((t: any) => (
-                                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                                    ))}
-                                                </select>
-                                            )}
-                                        </div>
-                                    ))
+                                                    ⭐
+                                                </button>
+                                            </div>
+                                        )
+                                    })
                                 ) : (
                                     <div className="text-sm opacity-50 text-center py-4">팀원이 없습니다.</div>
                                 )}
@@ -238,6 +385,15 @@ function TabTeams({ teams, players, onAssign, isAdmin, sessionId: _sessionId }: 
                     )
                 })}
             </div>
+
+            {/* Rating Modal */}
+            {ratingPlayer && (
+                <RatingModal
+                    player={ratingPlayer}
+                    sessionId={Number(sessionId)}
+                    onClose={() => setRatingPlayer(null)}
+                />
+            )}
         </div>
     )
 }
@@ -256,12 +412,15 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, onAddMatch, onD
 }) {
     const navigate = useNavigate()
 
-    // Calculate Standings
+    // Calculate Standings - only from completed matches
     const standings = teams.map(t => ({
         ...t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0
     }))
 
-    matches.forEach(m => {
+    // Filter only completed matches for standings
+    const completedMatches = matches.filter(m => m.status === 'completed')
+
+    completedMatches.forEach(m => {
         const t1 = standings.find(t => t.id === m.team1_id)
         const t2 = standings.find(t => t.id === m.team2_id)
         if (!t1 || !t2) return
@@ -377,9 +536,36 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, onAddMatch, onD
                     {matches.map(m => {
                         const t1 = teams.find(t => t.id === m.team1_id)
                         const t2 = teams.find(t => t.id === m.team2_id)
+                        const isCompleted = m.status === 'completed'
                         return (
-                            <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm relative group">
-                                <div className="font-bold text-slate-300 w-8 text-xs">#{m.match_no}</div>
+                            <div key={m.id} className={cn(
+                                "bg-white p-4 rounded-xl border flex items-center justify-between shadow-sm relative group",
+                                isCompleted ? "border-green-200" : "border-slate-200 opacity-75"
+                            )}>
+                                {/* Match Number & Status */}
+                                <div className="flex flex-col items-center gap-1 w-12">
+                                    <div className="font-bold text-slate-300 text-xs">#{m.match_no}</div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => onUpdateMatch(m.id, { status: isCompleted ? 'pending' : 'completed' })}
+                                            className={cn(
+                                                "text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors",
+                                                isCompleted ? "bg-green-100 text-green-600 hover:bg-green-200" : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                                            )}
+                                            title={isCompleted ? "경기 완료됨 (클릭해서 대기로 변경)" : "대기 중 (클릭해서 완료로 변경)"}
+                                        >
+                                            {isCompleted ? "완료" : "대기"}
+                                        </button>
+                                    )}
+                                    {!isAdmin && (
+                                        <span className={cn(
+                                            "text-[10px] px-1.5 py-0.5 rounded font-bold",
+                                            isCompleted ? "bg-green-100 text-green-600" : "bg-slate-100 text-slate-400"
+                                        )}>
+                                            {isCompleted ? "완료" : "대기"}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="flex-1 flex items-center justify-center gap-2 md:gap-4">
 
                                     {/* Team 1 */}
@@ -398,12 +584,23 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, onAddMatch, onD
                                     {/* Score - Click to open match live page */}
                                     <button
                                         onClick={() => navigate(`/sessions/${sessionId}/match/${m.id}/record`)}
-                                        className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 shadow-inner hover:bg-slate-100 hover:border-blue-200 transition-all cursor-pointer group"
+                                        className={cn(
+                                            "flex items-center gap-3 px-4 py-2 rounded-xl border shadow-inner transition-all cursor-pointer group",
+                                            isCompleted
+                                                ? "bg-green-50 border-green-200 hover:bg-green-100"
+                                                : "bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-blue-200"
+                                        )}
                                         title="클릭하여 기록 페이지로 이동"
                                     >
-                                        <span className="w-8 text-center font-black text-2xl text-slate-900 group-hover:text-blue-600 transition-colors">{m.team1_score ?? 0}</span>
+                                        <span className={cn(
+                                            "w-8 text-center font-black text-2xl transition-colors",
+                                            isCompleted ? "text-green-700" : "text-slate-400 group-hover:text-blue-600"
+                                        )}>{isCompleted ? (m.team1_score ?? 0) : "-"}</span>
                                         <span className="text-slate-300 font-bold">:</span>
-                                        <span className="w-8 text-center font-black text-2xl text-slate-900 group-hover:text-blue-600 transition-colors">{m.team2_score ?? 0}</span>
+                                        <span className={cn(
+                                            "w-8 text-center font-black text-2xl transition-colors",
+                                            isCompleted ? "text-green-700" : "text-slate-400 group-hover:text-blue-600"
+                                        )}>{isCompleted ? (m.team2_score ?? 0) : "-"}</span>
                                     </button>
 
                                     {/* Team 2 */}
@@ -436,11 +633,13 @@ function TabScoreboard({ matches, teams, onUpdateMatch, isAdmin, onAddMatch, onD
 export default function SessionDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const { actualTheme } = useTheme()
     const [searchParams] = useSearchParams()
     const initialTab = (searchParams.get('tab') as 'overview' | 'teams' | 'scoreboard') || 'overview'
     const [session, setSession] = useState<any>(null)
     const [error, setError] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'overview' | 'teams' | 'scoreboard'>(initialTab)
+    const [showShareCard, setShowShareCard] = useState(false)
 
     // Auth State
     const role = localStorage.getItem('user_role')
@@ -689,13 +888,62 @@ export default function SessionDetail() {
 
     return (
         <div className="max-w-4xl mx-auto pb-20">
+            {/* Share Card Modal */}
+            {showShareCard && (activeTab === 'teams' || activeTab === 'scoreboard') && (
+                <ShareCard
+                    type={activeTab === 'scoreboard' ? 'standings' : 'teams'}
+                    sessionDate={session.session_date}
+                    data={{
+                        teams: session.teams || [],
+                        matchStats: session.matchStats || [],
+                        standings: activeTab === 'scoreboard' ? (() => {
+                            // Calculate standings from matches
+                            const standings = (session.teams || []).map((t: any) => ({
+                                ...t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0
+                            }))
+                                // Filter only completed matches
+                                ; (session.matches || []).filter((m: any) => m.status === 'completed').forEach((m: any) => {
+                                    const t1 = standings.find((t: any) => t.id === m.team1_id)
+                                    const t2 = standings.find((t: any) => t.id === m.team2_id)
+                                    if (!t1 || !t2) return
+                                    const s1 = m.team1_score || 0
+                                    const s2 = m.team2_score || 0
+                                    t1.played++; t2.played++
+                                    t1.gf += s1; t1.ga += s2
+                                    t2.gf += s2; t2.ga += s1
+                                    if (s1 > s2) { t1.won++; t1.points += 3; t2.lost++ }
+                                    else if (s2 > s1) { t2.won++; t2.points += 3; t1.lost++ }
+                                    else { t1.drawn++; t1.points += 1; t2.drawn++; t2.points += 1 }
+                                })
+                            standings.sort((a: any, b: any) => {
+                                if (b.points !== a.points) return b.points - a.points
+                                const gdA = a.gf - a.ga
+                                const gdB = b.gf - b.ga
+                                if (gdB !== gdA) return gdB - gdA
+                                return b.gf - a.gf
+                            })
+                            return standings
+                        })() : undefined
+                    }}
+                    onClose={() => setShowShareCard(false)}
+                />
+            )}
+
             {/* Toggle Admin Mode */}
             <div className="flex justify-end mb-4 gap-2">
+                {(activeTab === 'teams' || activeTab === 'scoreboard') && (
+                    <button
+                        onClick={() => setShowShareCard(true)}
+                        className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg border bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-700 border-emerald-200 hover:from-emerald-100 hover:to-blue-100 font-bold shadow-sm transition-all"
+                    >
+                        <Share2 size={14} /> 공유 카드 만들기
+                    </button>
+                )}
                 <button
                     onClick={handleCapture}
                     className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 font-bold"
                 >
-                    <Download size={14} /> 이미지 저장
+                    <Download size={14} /> 화면 캡처
                 </button>
             </div>
 
@@ -705,6 +953,43 @@ export default function SessionDetail() {
                     <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold">
                         {session.session_date}
                     </span>
+                    {/* Game Order - Calculate week number of the year (based on Wednesdays) */}
+                    {(() => {
+                        const date = new Date(session.session_date)
+                        const year = date.getFullYear()
+
+                        // Calculate total Wednesdays in the year
+                        const getWednesdaysInYear = (y: number) => {
+                            let count = 0
+                            const d = new Date(y, 0, 1) // Jan 1
+                            while (d.getFullYear() === y) {
+                                if (d.getDay() === 3) count++ // 3 = Wednesday
+                                d.setDate(d.getDate() + 1)
+                            }
+                            return count
+                        }
+                        const totalWednesdays = getWednesdaysInYear(year)
+
+                        // Calculate which Wednesday this is in the year
+                        const getWednesdayNumber = (dateStr: string) => {
+                            const d = new Date(dateStr)
+                            const y = d.getFullYear()
+                            let count = 0
+                            const iterator = new Date(y, 0, 1)
+                            while (iterator <= d) {
+                                if (iterator.getDay() === 3) count++
+                                iterator.setDate(iterator.getDate() + 1)
+                            }
+                            return count
+                        }
+                        const weekNum = getWednesdayNumber(session.session_date)
+
+                        return (
+                            <span className="inline-block px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">
+                                {weekNum || 1}/{totalWednesdays}
+                            </span>
+                        )
+                    })()}
                     <span className={cn(
                         "px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
                         session.status === 'recruiting' ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
@@ -713,9 +998,9 @@ export default function SessionDetail() {
                     </span>
                 </div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h1 className="text-3xl font-extrabold text-slate-900">{session.title || '코너킥스 정기 풋살'}</h1>
-                    <div className="flex items-center gap-4 text-slate-500 text-sm font-medium">
-                        <span className="flex items-center gap-1"><MapPin size={16} /> 경북대 A구장</span>
+                    <h1 className={cn("text-3xl font-extrabold", actualTheme === 'dark' ? "text-slate-100" : "text-slate-900")}>{session.title || '코너킥스 정기 풋살'}</h1>
+                    <div className={cn("flex items-center gap-4 text-sm font-medium", actualTheme === 'dark' ? "text-slate-400" : "text-slate-500")}>
+                        <span className="flex items-center gap-1"><MapPin size={16} /> 수성대학교 2번구장</span>
                     </div>
                 </div>
             </div>
@@ -829,7 +1114,9 @@ export default function SessionDetail() {
             )}
 
             {/* Tabs */}
-            <div className="grid grid-cols-3 gap-1 mb-6 p-1 bg-slate-100/50 rounded-xl border border-slate-100">
+            <div className={cn("grid grid-cols-3 gap-1 mb-6 p-1 rounded-xl border",
+                actualTheme === 'dark' ? "bg-slate-800/50 border-slate-700" : "bg-slate-100/50 border-slate-100"
+            )}>
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
@@ -837,8 +1124,12 @@ export default function SessionDetail() {
                         className={cn(
                             "flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all",
                             activeTab === tab.id
-                                ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
-                                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                                ? actualTheme === 'dark'
+                                    ? "bg-slate-700 text-slate-100 shadow-sm ring-1 ring-slate-600"
+                                    : "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+                                : actualTheme === 'dark'
+                                    ? "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+                                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                         )}
                     >
                         <tab.icon size={14} className={activeTab === tab.id ? "text-blue-600" : ""} />
@@ -858,6 +1149,14 @@ export default function SessionDetail() {
                         onAssign={handleAssignPlayer}
                         isAdmin={isAdmin}
                         sessionId={id!}
+                        onUpdateTeamName={async (teamId, name) => {
+                            await fetch(`${API_URL}/sessions/${id}/teams/${teamId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name })
+                            })
+                            refreshSession()
+                        }}
                     />
                 )}
                 {activeTab === 'scoreboard' && (

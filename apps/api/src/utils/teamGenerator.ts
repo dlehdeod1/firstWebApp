@@ -10,6 +10,8 @@ export interface PlayerStats {
     marking: number;
     stamina: number;
     speed: number;
+    physical?: number; // 0-100
+    linkup?: number;   // 0-100
     height_cm?: number;
     weight_kg?: number;
     // Join date for naming
@@ -55,21 +57,15 @@ function calculatePlayerScore(p: PlayerStats): number {
     const mid = p.ball_keeping + p.passing;
     const def = p.intercept + p.marking;
     const base = p.stamina + p.speed;
-    // Physical: normalize height/weight to 1-10 scale roughly? 
-    // Requirement says physical is 1-10 input. 
-    // Let's assume input 'physical' is derived or we just use stats directly.
-    // Wait, requirement says: "physical(1~10): height, weight input -> auto calc".
-    // So 'physical' should be a field in PlayerStats if pre-calculated.
-    // If not, we need a calc. Let's assume it's pre-calculated in DB or passed as a field.
-    // For now, I'll add 'physical_rating' to PlayerStats interface.
-    const physical = (p as any).physical_rating || 5;
+    // Physical: use physical field directly (0-100 scale, default 50)
+    const physical = p.physical || 50;
 
     return (
         WEIGHTS.w1 * attack +
         WEIGHTS.w2 * mid +
         WEIGHTS.w3 * def +
         WEIGHTS.w4 * base +
-        WEIGHTS.w5 * physical
+        WEIGHTS.w5 * (physical / 10) // Scale down to approximate 1-10 weight
     );
 }
 
@@ -81,7 +77,7 @@ function calculateTeamStats(players: PlayerStats[]) {
         mid += (p.ball_keeping + p.passing);
         def += (p.intercept + p.marking);
         base += (p.stamina + p.speed);
-        physical += ((p as any).physical_rating || 5);
+        physical += (p.physical || 50);
         total += pScore;
     }
     return { attack, mid, def, base, physical, total };

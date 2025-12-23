@@ -126,9 +126,11 @@ CREATE TABLE IF NOT EXISTS player_match_stats (
   saves INTEGER DEFAULT 0,
   blocks INTEGER DEFAULT 0,
   key_passes INTEGER DEFAULT 0,
+  clearances INTEGER DEFAULT 0,
   notes TEXT,
   FOREIGN KEY (match_id) REFERENCES matches(id),
-  FOREIGN KEY (player_id) REFERENCES players(id)
+  FOREIGN KEY (player_id) REFERENCES players(id),
+  UNIQUE(player_id, match_id)
 );
 
 -- Rating Change Log

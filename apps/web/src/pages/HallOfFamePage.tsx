@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Trophy, Medal, Star, Crown, Calendar } from 'lucide-react'
+import { Trophy, Medal, Star, Crown, Calendar, TrendingUp } from 'lucide-react'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+const API_URL = import.meta.env.VITE_API_URL || 'https://conerkicks-api.conerkicks.workers.dev'
 
 interface HallOfFameEntry {
     rank: number
@@ -47,6 +47,7 @@ export default function HallOfFamePage() {
         { id: 'goals', label: '득점왕', icon: Trophy, color: 'from-yellow-400 to-amber-500' },
         { id: 'assists', label: '도움왕', icon: Medal, color: 'from-blue-400 to-blue-600' },
         { id: 'points', label: '공격포인트왕', icon: Trophy, color: 'from-orange-400 to-orange-600' },
+        { id: 'ppm', label: 'PPM왕', icon: TrendingUp, color: 'from-rose-400 to-rose-600' },
         { id: 'wins', label: '다승왕', icon: Crown, color: 'from-emerald-400 to-emerald-600' },
         { id: 'defenses', label: '수비왕', icon: Medal, color: 'from-slate-400 to-slate-600' },
         { id: 'attendance', label: '출석왕', icon: Star, color: 'from-purple-400 to-purple-600' },

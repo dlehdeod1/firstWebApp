@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Play, Pause, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+const API_URL = import.meta.env.VITE_API_URL || 'https://conerkicks-api.conerkicks.workers.dev'
 
 interface Player {
     id: number
@@ -23,17 +23,19 @@ interface Match {
     team2_id: number
     team1_score: number
     team2_score: number
+    status?: string
 }
 
 interface EventLog {
     id: string
     time: number // elapsed seconds
-    type: 'GOAL' | 'DEFENSE'
+    type: 'GOAL' | 'KEY_PASS' | 'BLOCK' | 'CLEARANCE' | 'DEFENSE'
     playerId: number
     playerName: string
     teamId: number
     assisterId?: number
     assisterName?: string
+    recordedBy?: string // username of who recorded this event
 }
 
 export default function MatchRecordPage() {
@@ -43,7 +45,7 @@ export default function MatchRecordPage() {
     const [match, setMatch] = useState<Match | null>(null)
     const [teams, setTeams] = useState<Team[]>([])
     const [loading, setLoading] = useState(true)
-    const [actionMode, setActionMode] = useState<'goal' | 'assist' | 'defense' | null>(null)
+    const [actionMode, setActionMode] = useState<'goal' | 'assist' | 'key_pass' | 'block' | 'clearance' | null>(null)
     const [pendingGoal, setPendingGoal] = useState<{ scorerId: number, teamId: number, scorerName: string } | null>(null)
 
     // Timer state
@@ -63,6 +65,22 @@ export default function MatchRecordPage() {
                 const m = data.matches?.find((m: any) => m.id === Number(matchId))
                 setMatch(m || null)
                 setTeams(data.teams || [])
+
+                // Load saved events from DB
+                const eventsRes = await fetch(`${API_URL}/matches/${matchId}/events`)
+                const eventsData = await eventsRes.json()
+                if (eventsData.events && eventsData.events.length > 0) {
+                    setEventLogs(eventsData.events.map((e: any) => ({
+                        id: e.id.toString(),
+                        time: e.time || 0,
+                        type: e.type,
+                        playerId: e.playerId,
+                        playerName: e.playerName,
+                        teamId: e.teamId,
+                        assisterId: e.assisterId,
+                        assisterName: e.assisterName
+                    })))
+                }
             } catch (e) {
                 console.error(e)
             } finally {
@@ -102,7 +120,7 @@ export default function MatchRecordPage() {
         const newLog: EventLog = {
             id: Date.now().toString(),
             time: elapsedTime,
-            type: type as 'GOAL' | 'DEFENSE',
+            type: type as 'GOAL' | 'KEY_PASS' | 'BLOCK' | 'CLEARANCE',
             playerId: scorerId,
             playerName: scorerName,
             teamId,
@@ -130,7 +148,7 @@ export default function MatchRecordPage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ type, scorerId, teamId, assisterId })
+                body: JSON.stringify({ type, scorerId, teamId, assisterId, eventTime: elapsedTime })
             })
 
             if (!res.ok) {
@@ -146,10 +164,21 @@ export default function MatchRecordPage() {
                         }
                     })
                 }
-                alert('기록 실패')
+                // Get detailed error from API
+                const errData = await res.json().catch(() => ({}))
+                console.error('API Error:', res.status, errData)
+                alert(`기록 실패: ${errData.error || res.statusText}${errData.details ? ` (${errData.details})` : ''}`)
+            } else {
+                // Success - update recordedBy from API response
+                const data = await res.json().catch(() => ({}))
+                if (data.recordedBy) {
+                    setEventLogs(prev => prev.map(e =>
+                        e.id === newLog.id ? { ...e, recordedBy: data.recordedBy } : e
+                    ))
+                }
             }
-        } catch (e) {
-            console.error(e)
+        } catch (e: any) {
+            console.error('Network/Parse error:', e)
             setEventLogs(prev => prev.filter(el => el.id !== newLog.id))
             if (type === 'GOAL') {
                 setMatch(prev => {
@@ -161,17 +190,20 @@ export default function MatchRecordPage() {
                     }
                 })
             }
-            alert('기록 실패')
+            alert(`기록 실패: ${e?.message || '네트워크 오류'}`)
         }
     }
 
     const deleteEvent = async (log: EventLog) => {
-        if (!confirm(`${log.playerName}의 ${log.type === 'GOAL' ? '골' : '호수비'} 기록을 삭제하시겠습니까?`)) return
+        const typeLabels: Record<string, string> = { GOAL: '골', KEY_PASS: '킬패스', BLOCK: '차단', CLEARANCE: '클리어링' }
+        if (!confirm(`${log.playerName}의 ${typeLabels[log.type] || log.type} 기록을 삭제하시겠습니까?`)) return
 
-        // Remove from local logs
+        const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
+
+        // Optimistic update - remove from local logs
         setEventLogs(prev => prev.filter(e => e.id !== log.id))
 
-        // Rollback score for goals
+        // Optimistic update - rollback score for goals
         if (log.type === 'GOAL') {
             setMatch(prev => {
                 if (!prev) return prev
@@ -181,23 +213,83 @@ export default function MatchRecordPage() {
                     team2_score: log.teamId === prev.team2_id ? Math.max(0, (prev.team2_score || 0) - 1) : (prev.team2_score || 0),
                 }
             })
+        }
 
-            // TODO: Call API to delete event from database
-            // For now, just update local state (DB will be updated when session closes)
+        // Call API to delete event from database
+        try {
+            const res = await fetch(`${API_URL}/matches/${matchId}/events`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    type: log.type,
+                    scorerId: log.playerId,
+                    teamId: log.teamId,
+                    assisterId: log.assisterId
+                })
+            })
+
+            if (!res.ok) {
+                // Rollback - re-add to logs
+                setEventLogs(prev => [log, ...prev])
+                if (log.type === 'GOAL') {
+                    setMatch(prev => {
+                        if (!prev) return prev
+                        return {
+                            ...prev,
+                            team1_score: log.teamId === prev.team1_id ? (prev.team1_score || 0) + 1 : (prev.team1_score || 0),
+                            team2_score: log.teamId === prev.team2_id ? (prev.team2_score || 0) + 1 : (prev.team2_score || 0),
+                        }
+                    })
+                }
+                const errData = await res.json().catch(() => ({}))
+                alert(`삭제 실패: ${errData.error || res.statusText}`)
+            }
+        } catch (e: any) {
+            console.error('Delete event error:', e)
+            // Rollback
+            setEventLogs(prev => [log, ...prev])
+            if (log.type === 'GOAL') {
+                setMatch(prev => {
+                    if (!prev) return prev
+                    return {
+                        ...prev,
+                        team1_score: log.teamId === prev.team1_id ? (prev.team1_score || 0) + 1 : (prev.team1_score || 0),
+                        team2_score: log.teamId === prev.team2_id ? (prev.team2_score || 0) + 1 : (prev.team2_score || 0),
+                    }
+                })
+            }
+            alert(`삭제 실패: ${e?.message || '네트워크 오류'}`)
         }
     }
 
-    const handlePlayerClick = (player: Player, teamId: number) => {
-        if (actionMode === 'goal') {
-            setPendingGoal({ scorerId: player.id, teamId, scorerName: player.name })
-            setActionMode('assist')
-        } else if (actionMode === 'assist' && pendingGoal) {
-            recordEvent('GOAL', pendingGoal.scorerId, pendingGoal.teamId, pendingGoal.scorerName, player.id, player.name)
-            setPendingGoal(null)
-            setActionMode(null)
-        } else if (actionMode === 'defense') {
-            recordEvent('DEFENSE', player.id, teamId, player.name)
-            setActionMode(null)
+    // handlePlayerClick removed - now using direct attack/defense section clicks
+
+    const resetMatch = async () => {
+        if (!confirm('⚠️ 이 경기의 모든 기록(로그, 점수)을 초기화하시겠습니까?\n(되돌릴 수 없습니다)')) return
+
+        const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
+
+        try {
+            const res = await fetch(`${API_URL}/matches/${matchId}/reset`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+
+            if (res.ok) {
+                setEventLogs([])
+                setMatch(prev => prev ? { ...prev, team1_score: 0, team2_score: 0 } : prev)
+                setElapsedTime(0)
+                setTimerRunning(false)
+                alert('✅ 경기 기록이 초기화되었습니다.')
+            } else {
+                const err = await res.json().catch(() => ({}))
+                alert(`초기화 실패: ${err.error || res.statusText}`)
+            }
+        } catch (e: any) {
+            alert(`초기화 실패: ${e?.message || '네트워크 오류'}`)
         }
     }
 
@@ -251,6 +343,13 @@ export default function MatchRecordPage() {
                         >
                             {timerRunning ? <Pause size={18} /> : <Play size={18} />}
                         </button>
+                        <button
+                            onClick={resetMatch}
+                            className="p-2 rounded-full bg-rose-100 text-rose-600 hover:bg-rose-200 transition-colors"
+                            title="경기 초기화"
+                        >
+                            🔄
+                        </button>
                     </div>
                 </div>
             </div>
@@ -273,13 +372,52 @@ export default function MatchRecordPage() {
                     </div>
                 </div>
 
+                {/* Match Complete Button */}
+                <button
+                    onClick={async () => {
+                        const token = localStorage.getItem('auth_token') || localStorage.getItem('token')
+                        try {
+                            const res = await fetch(`${API_URL}/matches/${matchId}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({ status: 'completed' })
+                            })
+                            if (res.ok) {
+                                // Update local match state
+                                setMatch(prev => prev ? { ...prev, status: 'completed' } : prev)
+                                alert('경기가 완료 처리되었습니다!')
+                                navigate(`/sessions/${sessionId}?tab=scoreboard`)
+                            } else {
+                                alert('경기 완료 처리 실패')
+                            }
+                        } catch (e) {
+                            console.error(e)
+                            alert('경기 완료 처리 실패')
+                        }
+                    }}
+                    disabled={match.status === 'completed'}
+                    className={cn(
+                        "w-full py-3 rounded-xl font-bold text-sm transition-colors",
+                        match.status === 'completed'
+                            ? "bg-green-100 text-green-600 cursor-default"
+                            : "bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98]"
+                    )}
+                >
+                    {match.status === 'completed' ? '✅ 경기 완료됨' : '🏁 경기 완료 처리'}
+                </button>
+
                 {/* Action Mode Indicator */}
                 {actionMode && (
                     <div className={cn(
                         "p-3 rounded-2xl text-center font-bold shadow-sm text-sm",
                         actionMode === 'goal' && "bg-emerald-500 text-white",
                         actionMode === 'assist' && "bg-amber-500 text-white",
-                        actionMode === 'defense' && "bg-violet-500 text-white"
+                        actionMode === 'key_pass' && "bg-orange-500 text-white",
+                        actionMode === 'block' && "bg-violet-500 text-white",
+                        actionMode === 'clearance' && "bg-blue-500 text-white"
                     )}>
                         {actionMode === 'goal' && "⚽ 득점자를 선택하세요"}
                         {actionMode === 'assist' && (
@@ -293,135 +431,240 @@ export default function MatchRecordPage() {
                                 </button>
                             </div>
                         )}
-                        {actionMode === 'defense' && "🛡️ 호수비 선수를 선택하세요"}
+                        {actionMode === 'key_pass' && "⚡ 킬패스 선수를 선택하세요"}
+                        {actionMode === 'block' && "🛡️ 차단 선수를 선택하세요"}
+                        {actionMode === 'clearance' && "🧹 클리어링 선수를 선택하세요"}
                     </div>
                 )}
 
-                {/* Teams Grid */}
+                {/* Teams with Attack/Defense Sections */}
                 <div className="grid grid-cols-2 gap-3">
                     {/* Team 1 */}
-                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                            <h3 className="font-bold text-slate-800 text-xs truncate flex-1">{team1?.name}</h3>
+                    <div className="space-y-3">
+                        {/* Team Header */}
+                        <div className="flex items-center gap-2 px-2">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <h3 className="font-bold text-slate-800 text-sm truncate">{team1?.name}</h3>
                         </div>
-                        <div className="space-y-1.5">
-                            {team1?.players?.map(p => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => handlePlayerClick(p, team1.id)}
-                                    disabled={!actionMode}
-                                    className={cn(
-                                        "w-full px-2 py-2 rounded-lg text-xs font-medium text-center transition-all border",
-                                        actionMode
-                                            ? "bg-red-50 border-red-100 text-red-900 hover:bg-red-100 active:scale-95"
-                                            : "bg-slate-50 border-slate-100 text-slate-400",
-                                        pendingGoal?.scorerId === p.id && "ring-2 ring-amber-400 bg-amber-50"
-                                    )}
-                                >
-                                    <span className="truncate">{p.name}</span>
-                                </button>
-                            ))}
+
+                        {/* Attack Section */}
+                        <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-3 border border-emerald-100">
+                            <div className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1">
+                                ⚽ 공격
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {team1?.players?.map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => {
+                                            if (actionMode === 'assist' && pendingGoal) {
+                                                recordEvent('GOAL', pendingGoal.scorerId, pendingGoal.teamId, pendingGoal.scorerName, p.id, p.name)
+                                                setActionMode(null)
+                                                setPendingGoal(null)
+                                            } else {
+                                                setActionMode('assist')
+                                                setPendingGoal({ scorerId: p.id, teamId: team1.id, scorerName: p.name })
+                                            }
+                                        }}
+                                        className={cn(
+                                            "px-2 py-2 rounded-lg text-xs font-bold text-center transition-all",
+                                            pendingGoal?.scorerId === p.id
+                                                ? "bg-amber-400 text-white ring-2 ring-amber-500"
+                                                : "bg-white text-emerald-800 hover:bg-emerald-100 active:scale-95 shadow-sm"
+                                        )}
+                                    >
+                                        {p.name}
+                                    </button>
+                                ))}
+                            </div>
+                            {actionMode === 'assist' && pendingGoal?.teamId === team1?.id && (
+                                <div className="mt-2 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-lg flex items-center justify-between">
+                                    <span>🎯 {pendingGoal!.scorerName} 골! 어시?</span>
+                                    <button
+                                        onClick={() => {
+                                            if (!pendingGoal) return
+                                            recordEvent('GOAL', pendingGoal.scorerId, pendingGoal.teamId, pendingGoal.scorerName)
+                                            setActionMode(null)
+                                            setPendingGoal(null)
+                                        }}
+                                        className="px-2 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-amber-800 font-bold"
+                                    >
+                                        없음
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Defense Section */}
+                        <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl p-3 border border-violet-100">
+                            <div className="text-xs font-bold text-violet-700 mb-2 flex items-center gap-1">
+                                🛡️ 수비
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {team1?.players?.map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => recordEvent('DEFENSE', p.id, team1.id, p.name)}
+                                        className="px-2 py-2 rounded-lg text-xs font-bold text-center bg-white text-violet-800 hover:bg-violet-100 active:scale-95 transition-all shadow-sm"
+                                    >
+                                        {p.name}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
                     {/* Team 2 */}
-                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                            <h3 className="font-bold text-slate-800 text-xs truncate flex-1">{team2?.name}</h3>
+                    <div className="space-y-3">
+                        {/* Team Header */}
+                        <div className="flex items-center gap-2 px-2">
+                            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                            <h3 className="font-bold text-slate-800 text-sm truncate">{team2?.name}</h3>
                         </div>
-                        <div className="space-y-1.5">
-                            {team2?.players?.map(p => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => handlePlayerClick(p, team2.id)}
-                                    disabled={!actionMode}
-                                    className={cn(
-                                        "w-full px-2 py-2 rounded-lg text-xs font-medium text-center transition-all border",
-                                        actionMode
-                                            ? "bg-blue-50 border-blue-100 text-blue-900 hover:bg-blue-100 active:scale-95"
-                                            : "bg-slate-50 border-slate-100 text-slate-400",
-                                        pendingGoal?.scorerId === p.id && "ring-2 ring-amber-400 bg-amber-50"
-                                    )}
-                                >
-                                    <span className="truncate">{p.name}</span>
-                                </button>
-                            ))}
+
+                        {/* Attack Section */}
+                        <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-3 border border-emerald-100">
+                            <div className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1">
+                                ⚽ 공격
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {team2?.players?.map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => {
+                                            if (actionMode === 'assist' && pendingGoal) {
+                                                recordEvent('GOAL', pendingGoal.scorerId, pendingGoal.teamId, pendingGoal.scorerName, p.id, p.name)
+                                                setActionMode(null)
+                                                setPendingGoal(null)
+                                            } else {
+                                                setActionMode('assist')
+                                                setPendingGoal({ scorerId: p.id, teamId: team2.id, scorerName: p.name })
+                                            }
+                                        }}
+                                        className={cn(
+                                            "px-2 py-2 rounded-lg text-xs font-bold text-center transition-all",
+                                            pendingGoal?.scorerId === p.id
+                                                ? "bg-amber-400 text-white ring-2 ring-amber-500"
+                                                : "bg-white text-emerald-800 hover:bg-emerald-100 active:scale-95 shadow-sm"
+                                        )}
+                                    >
+                                        {p.name}
+                                    </button>
+                                ))}
+                            </div>
+                            {actionMode === 'assist' && pendingGoal?.teamId === team2?.id && (
+                                <div className="mt-2 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-lg flex items-center justify-between">
+                                    <span>🎯 {pendingGoal!.scorerName} 골! 어시?</span>
+                                    <button
+                                        onClick={() => {
+                                            if (!pendingGoal) return
+                                            recordEvent('GOAL', pendingGoal.scorerId, pendingGoal.teamId, pendingGoal.scorerName)
+                                            setActionMode(null)
+                                            setPendingGoal(null)
+                                        }}
+                                        className="px-2 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-amber-800 font-bold"
+                                    >
+                                        없음
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Defense Section */}
+                        <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl p-3 border border-violet-100">
+                            <div className="text-xs font-bold text-violet-700 mb-2 flex items-center gap-1">
+                                🛡️ 수비
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {team2?.players?.map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => recordEvent('DEFENSE', p.id, team2.id, p.name)}
+                                        className="px-2 py-2 rounded-lg text-xs font-bold text-center bg-white text-violet-800 hover:bg-violet-100 active:scale-95 transition-all shadow-sm"
+                                    >
+                                        {p.name}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Event Logs */}
+                {/* Event Logs - Team Aligned */}
                 {eventLogs.length > 0 && (
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
                             📋 기록 로그
                         </h3>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {eventLogs.map(log => (
-                                <div key={log.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-sm gap-2">
-                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        <span className="text-slate-400 font-mono text-xs flex-shrink-0">{formatTime(log.time)}</span>
-                                        <span className="font-medium text-slate-800 truncate">{log.playerName}</span>
-                                        <span className="flex-shrink-0">{log.type === 'GOAL' ? '⚽' : '🛡️'}</span>
-                                        {log.assisterName && (
-                                            <span className="text-slate-500 text-xs truncate">← {log.assisterName}</span>
-                                        )}
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {eventLogs.map(log => {
+                                const isTeam1 = log.teamId === team1?.id
+                                const icon = log.type === 'GOAL' ? '⚽' : log.type === 'KEY_PASS' ? '⚡' : log.type === 'DEFENSE' ? '🛡️' : log.type === 'BLOCK' ? '🛡️' : '🧹'
+
+                                return (
+                                    <div key={log.id} className="flex items-center gap-2 text-sm">
+                                        {/* Team 1 Side */}
+                                        <div className={cn(
+                                            "flex-1 flex items-center gap-2 px-3 py-2 rounded-lg",
+                                            isTeam1 ? "bg-red-50 justify-end" : "opacity-0"
+                                        )}>
+                                            {isTeam1 && (
+                                                <>
+                                                    {log.assisterName && (
+                                                        <span className="text-slate-500 text-xs">{log.assisterName} →</span>
+                                                    )}
+                                                    <span className="font-bold text-red-800">{log.playerName}</span>
+                                                    <span className="text-slate-400 font-mono text-xs">{formatTime(log.time)}</span>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Center Icon */}
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg shadow-sm">
+                                            {icon}
+                                        </div>
+
+                                        {/* Team 2 Side */}
+                                        <div className={cn(
+                                            "flex-1 flex items-center gap-2 px-3 py-2 rounded-lg",
+                                            !isTeam1 ? "bg-blue-50 justify-start" : "opacity-0"
+                                        )}>
+                                            {!isTeam1 && (
+                                                <>
+                                                    <span className="text-slate-400 font-mono text-xs">{formatTime(log.time)}</span>
+                                                    <span className="font-bold text-blue-800">{log.playerName}</span>
+                                                    {log.assisterName && (
+                                                        <span className="text-slate-500 text-xs">← {log.assisterName}</span>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Delete Button */}
+                                        <button
+                                            onClick={() => deleteEvent(log)}
+                                            className="flex-shrink-0 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                        >
+                                            <X size={14} />
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => deleteEvent(log)}
-                                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Fixed Action Bar */}
+            {/* Fixed Bottom Bar - Simple */}
             <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-slate-200 shadow-2xl">
-                <div className="max-w-lg mx-auto p-4 grid grid-cols-2 gap-3">
+                <div className="max-w-lg mx-auto p-4">
                     <button
-                        onClick={() => {
-                            setActionMode(actionMode === 'goal' || actionMode === 'assist' ? null : 'goal')
-                            setPendingGoal(null)
-                        }}
-                        className={cn(
-                            "py-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2",
-                            actionMode === 'goal' || actionMode === 'assist'
-                                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30"
-                                : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                        )}
+                        onClick={() => navigate(`/sessions/${sessionId}?tab=scoreboard`)}
+                        className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-all"
                     >
-                        <span className="text-lg">⚽</span> 골 기록
-                    </button>
-                    <button
-                        onClick={() => {
-                            setActionMode(actionMode === 'defense' ? null : 'defense')
-                            setPendingGoal(null)
-                        }}
-                        className={cn(
-                            "py-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2",
-                            actionMode === 'defense'
-                                ? "bg-violet-600 text-white shadow-lg shadow-violet-500/30"
-                                : "bg-violet-100 text-violet-700 hover:bg-violet-200"
-                        )}
-                    >
-                        <span className="text-lg">🛡️</span> 호수비
+                        ← 현황판으로 돌아가기
                     </button>
                 </div>
-
-                {/* Save Button */}
-                <button
-                    onClick={() => navigate(`/sessions/${sessionId}?tab=scoreboard`)}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-lg shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all"
-                >
-                    ✅ 경기 저장 완료
-                </button>
             </div>
         </div>
     )

@@ -9,10 +9,12 @@ import {
     X,
     LayoutGrid,
     LayoutList,
+    ArrowUpDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/contexts/ThemeContext';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+const API_URL = import.meta.env.VITE_API_URL || 'https://conerkicks-api.conerkicks.workers.dev';
 
 interface Player {
     id: number;
@@ -42,48 +44,65 @@ interface Player {
 }
 
 const DEFAULT_STATS = {
-    shooting: 5,
-    offball_run: 5,
-    ball_keeping: 5,
-    passing: 5,
-    intercept: 5,
-    marking: 5,
-    stamina: 5,
-    speed: 5,
-    physical: 5,
-    linkup: 5,
+    shooting: 50,
+    offball_run: 50,
+    ball_keeping: 50,
+    passing: 50,
+    intercept: 50,
+    marking: 50,
+    stamina: 50,
+    speed: 50,
+    physical: 50,
+    linkup: 50,
 };
 
 /* -------------------------------------------------------------------------- */
-/* StatCell – table cell with a numeric input                                 */
+/* StatCell – table cell with slider + numeric input (0-100)                  */
 /* -------------------------------------------------------------------------- */
 const StatCell = ({
     value,
     onChange,
     bg,
-    disabled
+    disabled,
+    isDark
 }: {
     value: number;
     onChange: (v: number) => void;
     bg: string;
     disabled?: boolean;
+    isDark?: boolean;
 }) => (
-    <td className={`px-2 py-3 ${bg}`}>
-        <input
-            type="number"
-            min={1}
-            max={10}
-            disabled={disabled}
-            className={cn(
-                "w-8 text-center bg-transparent font-bold text-slate-700 outline-none focus:bg-white/50 rounded",
-                disabled && "opacity-50 cursor-not-allowed"
-            )}
-            value={value}
-            onChange={(e) => {
-                const val = parseInt(e.target.value);
-                if (!isNaN(val) && val >= 1 && val <= 10) onChange(val);
-            }}
-        />
+    <td className={`px-2 py-2 ${bg}`}>
+        <div className="flex items-center gap-1">
+            <input
+                type="range"
+                min={0}
+                max={100}
+                disabled={disabled}
+                className={cn(
+                    "w-12 h-1.5 accent-blue-600",
+                    disabled && "opacity-50 cursor-not-allowed"
+                )}
+                value={value}
+                onChange={(e) => onChange(parseInt(e.target.value))}
+            />
+            <input
+                type="number"
+                min={0}
+                max={100}
+                disabled={disabled}
+                className={cn(
+                    "w-10 text-center bg-transparent font-bold outline-none rounded text-sm",
+                    isDark ? "text-slate-300 focus:bg-slate-700/50" : "text-slate-700 focus:bg-white/50",
+                    disabled && "opacity-50 cursor-not-allowed"
+                )}
+                value={value}
+                onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val) && val >= 0 && val <= 100) onChange(val);
+                }}
+            />
+        </div>
     </td>
 );
 
@@ -91,6 +110,7 @@ export default function PlayerEditor() {
     /* ---------------------------------------------------------------------- */
     /* State                                                                 */
     /* ---------------------------------------------------------------------- */
+    const { actualTheme } = useTheme();
     const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -102,7 +122,20 @@ export default function PlayerEditor() {
     const [modified, setModified] = useState<Record<number, Player>>({});
     const [currentUserRole, setCurrentUserRole] = useState('');
     const [roleLoaded, setRoleLoaded] = useState(false);
-    const [viewMode, setViewMode] = useState<'table' | 'card'>('card'); // Default to card for mobile
+    const [viewMode, setViewMode] = useState<'table' | 'card' | 'myrating'>('card'); // Default to card for mobile
+
+    // Rating state for myrating view (TODO: Uncomment when implementing ratings feature)
+    // const [myRatings, setMyRatings] = useState<Record<number, Record<string, number>>>({}); // playerId -> stats
+    // const [aggregatedRatings, setAggregatedRatings] = useState<Record<number, Record<string, number>>>({}); // weighted avg
+    // const [modifiedRatings, setModifiedRatings] = useState<Record<number, Record<string, number>>>({}); // changed ratings
+    // const [ratedPlayerIds, setRatedPlayerIds] = useState<Set<number>>(new Set());
+
+    // Sorting state
+    const [sortColumn, setSortColumn] = useState<keyof Player | null>(null);
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+    // Player detail popup (prepared for future feature)
+    const [_selectedPlayer, _setSelectedPlayer] = useState<Player | null>(null);
 
     /* ---------------------------------------------------------------------- */
     /* Effect – fetch data & determine role                                    */
@@ -193,13 +226,118 @@ export default function PlayerEditor() {
         }
     };
 
+    // Fetch ratings (aggregated + my ratings)
+    // TODO: Uncomment when implementing ratings feature
+    /* const fetchRatings = async () => {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+
+        try {
+            // Fetch aggregated ratings for all players
+            const aggMap: Record<number, Record<string, number>> = {};
+            const myMap: Record<number, Record<string, number>> = {};
+            const ratedIds = new Set<number>();
+
+            for (const player of players) {
+                // Get aggregated rating
+                const aggRes = await fetch(`${API_URL}/ratings/player/${player.id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (aggRes.ok) {
+                    const data = await aggRes.json();
+                    if (data.aggregated) {
+                        aggMap[player.id] = data.aggregated;
+                    }
+                }
+
+                // Get my rating for this player
+                const myRes = await fetch(`${API_URL}/ratings/my/${player.id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (myRes.ok) {
+                    const data = await myRes.json();
+                    if (data.rating) {
+                        myMap[player.id] = {
+                            shooting: data.rating.shooting,
+                            offball_run: data.rating.offball_run,
+                            ball_keeping: data.rating.ball_keeping,
+                            passing: data.rating.passing,
+                            intercept: data.rating.intercept,
+                            marking: data.rating.marking,
+                            stamina: data.rating.stamina,
+                            speed: data.rating.speed,
+                        };
+                        ratedIds.add(player.id);
+                    }
+                }
+            }
+
+            setAggregatedRatings(aggMap);
+            setMyRatings(myMap);
+            setRatedPlayerIds(ratedIds);
+        } catch (e) {
+            console.error('Failed to fetch ratings:', e);
+        }
+    }; */
+
+    // Save all modified ratings at once
+    /* const saveAllRatings = async () => {
+        const token = localStorage.getItem('auth_token');
+        if (!token || Object.keys(modifiedRatings).length === 0) {
+            alert('변경된 평가가 없습니다.');
+            return;
+        }
+
+        try {
+            let successCount = 0;
+            for (const [playerIdStr, stats] of Object.entries(modifiedRatings)) {
+                const playerId = Number(playerIdStr);
+                const res = await fetch(`${API_URL}/ratings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ playerId, ...stats })
+                });
+                if (res.ok) successCount++;
+            }
+
+            if (successCount > 0) {
+                alert(`✅ ${successCount}명의 선수 평가가 저장되었습니다!`);
+                setModifiedRatings({});
+                // Merge modified into myRatings
+                setMyRatings(prev => ({ ...prev, ...modifiedRatings }));
+                setRatedPlayerIds(prev => {
+                    const newSet = new Set(prev);
+                    Object.keys(modifiedRatings).forEach(id => newSet.add(Number(id)));
+                    return newSet;
+                });
+            }
+        } catch (e) {
+            console.error('Save ratings failed:', e);
+            alert('평가 저장 실패');
+        }
+    }; */
+
+    // Handle rating change in myrating view
+    /* const handleRatingChange = (playerId: number, stat: string, value: number) => {
+        setModifiedRatings(prev => ({
+            ...prev,
+            [playerId]: {
+                ...(prev[playerId] || myRatings[playerId] || {}),
+                [stat]: value
+            }
+        }));
+    }; */
+
     /* ---------------------------------------------------------------------- */
     /* Permission helpers                                                     */
     /* ---------------------------------------------------------------------- */
     const isAdmin = ['admin', 'ADMIN'].includes(currentUserRole);
     const isOwner = ['owner', 'OWNER'].includes(currentUserRole);
-    const canEdit = isAdmin; // ADMIN can edit everything
-    const canView = isAdmin || isOwner; // OWNER/ADMIN can view list
+    const canEdit = isAdmin || isOwner; // ADMIN or OWNER can edit
+    const canView = true; // Everyone can view player list
 
     // Debug Log for Critical Rendering Path
     if (roleLoaded) {
@@ -360,7 +498,7 @@ export default function PlayerEditor() {
     /* ---------------------------------------------------------------------- */
     // [FIX] Block Flash of Content: Wait for BOTH loading and roleLoaded
     if (loading || !roleLoaded) {
-        return <div className="p-20 text-center text-slate-500 animate-pulse">데이터 및 권한 로딩 중...</div>
+        return <div className={cn("p-20 text-center animate-pulse", actualTheme === 'dark' ? "text-slate-400" : "text-slate-500")}>데이터 및 권한 로딩 중...</div>
     }
 
     if (!canView) {
@@ -387,17 +525,31 @@ export default function PlayerEditor() {
         );
     }
 
-    // Helper to calculate overall rating for sorting
-    const getOverallRating = (p: Player) => {
-        const totalStats = p.shooting + p.offball_run + p.ball_keeping + p.passing +
-            p.intercept + p.marking + p.stamina + p.speed +
-            (p.physical || 5) + (p.linkup || 5);
-        return Math.round((totalStats / 10) * 10);
+    // Handle column sort click
+    const handleSort = (column: keyof Player) => {
+        if (sortColumn === column) {
+            setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('desc');
+        }
     };
 
     const filteredPlayers = players
         .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-        .sort((a, b) => getOverallRating(b) - getOverallRating(a)); // Sort by overall rating (highest first)
+        .sort((a, b) => {
+            if (sortColumn) {
+                const aVal = a[sortColumn] ?? 0;
+                const bVal = b[sortColumn] ?? 0;
+                if (typeof aVal === 'number' && typeof bVal === 'number') {
+                    return sortDirection === 'desc' ? bVal - aVal : aVal - bVal;
+                }
+                return sortDirection === 'desc'
+                    ? String(bVal).localeCompare(String(aVal), 'ko')
+                    : String(aVal).localeCompare(String(bVal), 'ko');
+            }
+            return a.name.localeCompare(b.name, 'ko');
+        });
 
     const linkedUserIds = new Set(
         players.map((p) => (p as any).user_id).filter(Boolean),
@@ -407,36 +559,44 @@ export default function PlayerEditor() {
         <div className="max-w-7xl mx-auto p-4 md:p-8 pb-24">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 flex items-center gap-2 mb-1">
+                <h1 className={cn("text-2xl md:text-3xl font-extrabold flex items-center gap-2 mb-1", actualTheme === 'dark' ? "text-slate-100" : "text-slate-900")}>
                     <Users className="text-blue-600" size={28} /> 선수 관리
                 </h1>
-                <p className="text-sm text-slate-500">
+                <p className={cn("text-sm", actualTheme === 'dark' ? "text-slate-400" : "text-slate-500")}>
                     {filteredPlayers.length}명의 선수 · 능력치 수정 및 계정 연결
                 </p>
             </div>
 
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div className={cn("flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 p-3 rounded-xl border",
+                actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100"
+            )}>
                 {/* Left: Search + View Toggle */}
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative flex-1 sm:flex-initial">
-                        <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                        <Search className={cn("absolute left-3 top-2.5", actualTheme === 'dark' ? "text-slate-500" : "text-slate-400")} size={16} />
                         <input
                             type="text"
                             placeholder="이름 검색..."
                             value={search}
                             onChange={handleSearch}
-                            className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-44 text-sm bg-white"
+                            className={cn("pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-44 text-sm",
+                                actualTheme === 'dark'
+                                    ? "bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500"
+                                    : "bg-white border-slate-200"
+                            )}
                         />
                     </div>
 
                     {/* View Mode Toggle */}
-                    <div className="flex bg-white rounded-lg p-1 border border-slate-200">
+                    <div className={cn("flex rounded-lg p-1 border",
+                        actualTheme === 'dark' ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                    )}>
                         <button
                             onClick={() => setViewMode('card')}
                             className={cn(
                                 "p-1.5 rounded transition-colors",
-                                viewMode === 'card' ? "bg-blue-100 text-blue-600" : "text-slate-400 hover:text-slate-600"
+                                viewMode === 'card' ? "bg-blue-100 text-blue-600" : (actualTheme === 'dark' ? "text-slate-500 hover:text-slate-300" : "text-slate-400 hover:text-slate-600")
                             )}
                             title="카드 뷰"
                         >
@@ -446,7 +606,7 @@ export default function PlayerEditor() {
                             onClick={() => setViewMode('table')}
                             className={cn(
                                 "p-1.5 rounded transition-colors",
-                                viewMode === 'table' ? "bg-blue-100 text-blue-600" : "text-slate-400 hover:text-slate-600"
+                                viewMode === 'table' ? "bg-blue-100 text-blue-600" : (actualTheme === 'dark' ? "text-slate-500 hover:text-slate-300" : "text-slate-400 hover:text-slate-600")
                             )}
                             title="테이블 뷰"
                         >
@@ -485,11 +645,11 @@ export default function PlayerEditor() {
             {viewMode === 'card' && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {filteredPlayers.map((p) => {
-                        // Calculate overall rating (average of all 10 stats, on 100-point scale)
+                        // Calculate overall rating (average of all 10 stats, already 0-100)
                         const totalStats = p.shooting + p.offball_run + p.ball_keeping + p.passing +
                             p.intercept + p.marking + p.stamina + p.speed +
-                            (p.physical || 5) + (p.linkup || 5);
-                        const overallRating = Math.round((totalStats / 10) * 10); // 1-10 scale -> 10-100
+                            (p.physical || 50) + (p.linkup || 50);
+                        const overallRating = Math.round(totalStats / 10); // Already 0-100, just average
 
                         // Card gradient color based on rating (new tier system)
                         // 90+ = Master (rainbow/holographic)
@@ -524,14 +684,14 @@ export default function PlayerEditor() {
                                         ? 'ring-2 ring-orange-600' // Bronze
                                         : 'ring-1 ring-slate-500'; // Basic - thin border
 
-                        // Use actual stats with Korean labels (9 stats -> show 6 key ones)
+                        // Use actual stats with Korean labels (0-100 scale)
                         const cardStats = [
-                            { label: '슈팅', value: Math.round(p.shooting) },
-                            { label: '침투', value: Math.round(p.offball_run) },
-                            { label: '패스', value: Math.round(p.passing) },
-                            { label: '차단', value: Math.round(p.intercept) },
-                            { label: '속도', value: Math.round(p.speed) },
-                            { label: '체력', value: Math.round(p.stamina) },
+                            { label: '슈팅', value: p.shooting },
+                            { label: '침투', value: p.offball_run },
+                            { label: '패스', value: p.passing },
+                            { label: '연계', value: p.linkup || 50 },
+                            { label: '차단', value: p.intercept },
+                            { label: '체력', value: p.stamina },
                         ];
 
                         return (
@@ -641,34 +801,172 @@ export default function PlayerEditor() {
             {/* Player Table (Desktop View)                                        */}
             {/* ------------------------------------------------------------------ */}
             {viewMode === 'table' && (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-                    <table className="w-full bg-white text-sm">
-                        <thead className="bg-slate-50 border-b border-slate-200">
+                <div className={cn("overflow-x-auto rounded-xl border shadow-sm max-h-[70vh]",
+                    actualTheme === 'dark' ? "border-slate-700" : "border-slate-200"
+                )}>
+                    <table className={cn("w-full text-sm", actualTheme === 'dark' ? "bg-slate-800" : "bg-white")}>
+                        <thead className={cn("border-b sticky top-0 z-10",
+                            actualTheme === 'dark' ? "bg-slate-900 border-slate-700" : "bg-slate-50 border-slate-200"
+                        )}>
                             <tr>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">ID</th>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">이름</th>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">코드</th>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">역할</th>
-                                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">연결</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">슈팅</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">침투</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">키핑</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">패스</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">차단</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">마킹</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">체력</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">속도</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">피지컬</th>
-                                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">연계</th>
-                                {canEdit && <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">액션</th>}
+                                {/* Sticky Name Column */}
+                                <th
+                                    className={cn("px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap sticky left-0 z-20 cursor-pointer transition-colors",
+                                        actualTheme === 'dark'
+                                            ? "bg-slate-900 text-slate-300 hover:bg-slate-800"
+                                            : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('name')}
+                                >
+                                    <span className="flex items-center gap-1">
+                                        이름
+                                        <ArrowUpDown size={12} className={sortColumn === 'name' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th className={cn("px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap",
+                                    actualTheme === 'dark' ? "text-slate-300" : "text-slate-600"
+                                )}>코드</th>
+                                <th className={cn("px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap",
+                                    actualTheme === 'dark' ? "text-slate-300" : "text-slate-600"
+                                )}>역할</th>
+                                <th className={cn("px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap",
+                                    actualTheme === 'dark' ? "text-slate-300" : "text-slate-600"
+                                )}>연결</th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('shooting')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        슈팅
+                                        <ArrowUpDown size={12} className={sortColumn === 'shooting' ? 'text-blue-600' : 'text-slate-400'} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('offball_run')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        침투
+                                        <ArrowUpDown size={12} className={sortColumn === 'offball_run' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('ball_keeping')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        키핑
+                                        <ArrowUpDown size={12} className={sortColumn === 'ball_keeping' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('passing')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        패스
+                                        <ArrowUpDown size={12} className={sortColumn === 'passing' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('intercept')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        차단
+                                        <ArrowUpDown size={12} className={sortColumn === 'intercept' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('marking')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        마킹
+                                        <ArrowUpDown size={12} className={sortColumn === 'marking' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('stamina')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        체력
+                                        <ArrowUpDown size={12} className={sortColumn === 'stamina' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('speed')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        속도
+                                        <ArrowUpDown size={12} className={sortColumn === 'speed' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('physical')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        피지컬
+                                        <ArrowUpDown size={12} className={sortColumn === 'physical' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                <th
+                                    className={cn("px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-colors",
+                                        actualTheme === 'dark' ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                                    )}
+                                    onClick={() => handleSort('linkup')}
+                                >
+                                    <span className="flex items-center justify-center gap-1">
+                                        연계
+                                        <ArrowUpDown size={12} className={sortColumn === 'linkup' ? 'text-blue-600' : (actualTheme === 'dark' ? 'text-slate-500' : 'text-slate-400')} />
+                                    </span>
+                                </th>
+                                {canEdit && <th className={cn("px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap",
+                                    actualTheme === 'dark' ? "text-slate-300" : "text-slate-600"
+                                )}>액션</th>}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className={cn("divide-y", actualTheme === 'dark' ? "divide-slate-700" : "divide-slate-100")}>
                             {filteredPlayers.map((p, idx) => (
-                                <tr key={p.id} className={cn("hover:bg-slate-50 transition-colors", idx % 2 === 0 ? "bg-white" : "bg-slate-25")}>
-                                    <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{p.id}</td>
-                                    <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{p.name}</td>
-                                    <td className="px-3 py-2.5 font-mono text-xs text-slate-400 whitespace-nowrap">{p.player_code ?? '-'}</td>
+                                <tr key={p.id} className={cn("transition-colors",
+                                    actualTheme === 'dark'
+                                        ? (idx % 2 === 0 ? "bg-slate-800 hover:bg-slate-750" : "bg-slate-850 hover:bg-slate-750")
+                                        : (idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-25 hover:bg-slate-50")
+                                )}>
+                                    {/* Sticky Name Column */}
+                                    <td
+                                        className={cn("px-3 py-2.5 font-semibold whitespace-nowrap sticky left-0 z-10",
+                                            actualTheme === 'dark'
+                                                ? (idx % 2 === 0 ? "bg-slate-800 text-slate-100" : "bg-slate-900 text-slate-100")
+                                                : (idx % 2 === 0 ? "bg-white text-slate-900" : "bg-slate-50 text-slate-900")
+                                        )}
+                                    >
+                                        {p.name}
+                                    </td>
+                                    <td className={cn("px-3 py-2.5 font-mono text-xs whitespace-nowrap",
+                                        actualTheme === 'dark' ? "text-slate-500" : "text-slate-400"
+                                    )}>{p.player_code ?? '-'}</td>
                                     <td className="px-4 py-2 text-sm">
                                         {p.user_id && canEdit ? (
                                             <select
@@ -802,62 +1100,72 @@ export default function PlayerEditor() {
                                     <StatCell
                                         value={p.shooting}
                                         onChange={(v) => handleStatChange(p.id, 'shooting', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.offball_run}
                                         onChange={(v) => handleStatChange(p.id, 'offball_run', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.ball_keeping}
                                         onChange={(v) => handleStatChange(p.id, 'ball_keeping', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.passing}
                                         onChange={(v) => handleStatChange(p.id, 'passing', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.intercept}
                                         onChange={(v) => handleStatChange(p.id, 'intercept', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.marking}
                                         onChange={(v) => handleStatChange(p.id, 'marking', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.stamina}
                                         onChange={(v) => handleStatChange(p.id, 'stamina', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.speed}
                                         onChange={(v) => handleStatChange(p.id, 'speed', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.physical || 5}
                                         onChange={(v) => handleStatChange(p.id, 'physical', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
                                     <StatCell
                                         value={p.linkup || 5}
                                         onChange={(v) => handleStatChange(p.id, 'linkup', v)}
-                                        bg={canEdit ? 'bg-slate-50' : 'bg-slate-100'}
+                                        bg={canEdit ? (actualTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50') : (actualTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-100')}
                                         disabled={!canEdit}
+                                        isDark={actualTheme === 'dark'}
                                     />
 
                                     {canEdit && (
@@ -893,15 +1201,21 @@ export default function PlayerEditor() {
             {/* ------------------------------------------------------------------ */}
             {editing && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50">
-                    <div className="bg-white rounded-t-2xl md:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
+                    <div className={cn("rounded-t-2xl md:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl",
+                        actualTheme === 'dark' ? "bg-slate-800" : "bg-white"
+                    )}>
                         {/* Modal Header */}
-                        <div className="sticky top-0 bg-white border-b border-slate-100 p-4 flex items-center justify-between z-10">
-                            <h2 className="text-lg font-bold text-slate-900">
+                        <div className={cn("sticky top-0 border-b p-4 flex items-center justify-between z-10",
+                            actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                        )}>
+                            <h2 className={cn("text-lg font-bold", actualTheme === 'dark' ? "text-slate-100" : "text-slate-900")}>
                                 {isNew ? '새 선수 등록' : `${editing.name} 수정`}
                             </h2>
                             <button
                                 onClick={handleCancelEdit}
-                                className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
+                                className={cn("p-2 rounded-full",
+                                    actualTheme === 'dark' ? "hover:bg-slate-700 text-slate-400" : "hover:bg-slate-100 text-slate-400"
+                                )}
                             >
                                 <X size={20} />
                             </button>
@@ -911,7 +1225,9 @@ export default function PlayerEditor() {
                             {/* Basic Info */}
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                    <label className={cn("block text-xs font-bold uppercase tracking-wider mb-2",
+                                        actualTheme === 'dark' ? "text-slate-400" : "text-slate-500"
+                                    )}>
                                         선수 이름
                                     </label>
                                     <input
@@ -920,13 +1236,17 @@ export default function PlayerEditor() {
                                         onChange={(e) =>
                                             setEditing({ ...editing, name: e.target.value })
                                         }
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                        className={cn("w-full border rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none",
+                                            actualTheme === 'dark' ? "bg-slate-900 border-slate-700 text-slate-100" : "border-slate-200"
+                                        )}
                                         placeholder="이름 입력"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                    <label className={cn("block text-xs font-bold uppercase tracking-wider mb-2",
+                                        actualTheme === 'dark' ? "text-slate-400" : "text-slate-500"
+                                    )}>
                                         선수 코드
                                     </label>
                                     <input
@@ -936,15 +1256,19 @@ export default function PlayerEditor() {
                                             setEditing({ ...editing, player_code: e.target.value.toUpperCase() })
                                         }
                                         placeholder="자동 생성"
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-3 font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                        className={cn("w-full border rounded-xl px-4 py-3 font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none",
+                                            actualTheme === 'dark' ? "bg-slate-900 border-slate-700 text-slate-100" : "border-slate-200"
+                                        )}
                                         maxLength={6}
                                     />
-                                    <p className="text-xs text-slate-400 mt-1">비워두면 자동 생성됩니다</p>
+                                    <p className={cn("text-xs mt-1", actualTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>비워두면 자동 생성됩니다</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                        <label className={cn("block text-xs font-bold uppercase tracking-wider mb-2",
+                                            actualTheme === 'dark' ? "text-slate-400" : "text-slate-500"
+                                        )}>
                                             생년 🎂
                                         </label>
                                         <input
@@ -954,13 +1278,17 @@ export default function PlayerEditor() {
                                                 setEditing({ ...editing, birth_year: e.target.value ? parseInt(e.target.value) : undefined })
                                             }
                                             placeholder="1990"
-                                            className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                            className={cn("w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none",
+                                                actualTheme === 'dark' ? "bg-slate-900 border-slate-700 text-slate-100" : "border-slate-200"
+                                            )}
                                             min={1950}
                                             max={2015}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                        <label className={cn("block text-xs font-bold uppercase tracking-wider mb-2",
+                                            actualTheme === 'dark' ? "text-slate-400" : "text-slate-500"
+                                        )}>
                                             사진 URL 📷
                                         </label>
                                         <input
@@ -970,7 +1298,9 @@ export default function PlayerEditor() {
                                                 setEditing({ ...editing, photo_url: e.target.value || undefined })
                                             }
                                             placeholder="/player-photos/name.jpg"
-                                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                            className={cn("w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none",
+                                                actualTheme === 'dark' ? "bg-slate-900 border-slate-700 text-slate-100" : "border-slate-200"
+                                            )}
                                         />
                                     </div>
                                 </div>
@@ -978,7 +1308,9 @@ export default function PlayerEditor() {
 
                             {/* Stats Section */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                                <label className={cn("block text-xs font-bold uppercase tracking-wider mb-3",
+                                    actualTheme === 'dark' ? "text-slate-400" : "text-slate-500"
+                                )}>
                                     능력치 (1-10)
                                 </label>
                                 <div className="space-y-2">
@@ -997,17 +1329,27 @@ export default function PlayerEditor() {
                                         // Handle undefined/null values with default of 5
                                         const statValue = (editing[stat.key] as number) ?? 5;
                                         return (
-                                            <div key={stat.key} className="flex items-center gap-3 p-2 bg-slate-50 rounded-xl">
+                                            <div key={stat.key} className={cn("flex items-center gap-3 p-2 rounded-xl",
+                                                actualTheme === 'dark' ? "bg-slate-900/50" : "bg-slate-50"
+                                            )}>
                                                 <span className="text-lg w-8 text-center">{stat.emoji}</span>
-                                                <span className="text-sm font-bold text-slate-700 w-16">{stat.label}</span>
+                                                <span className={cn("text-sm font-bold w-16",
+                                                    actualTheme === 'dark' ? "text-slate-300" : "text-slate-700"
+                                                )}>{stat.label}</span>
                                                 <div className="flex-1 flex items-center gap-1">
                                                     <button
                                                         onClick={() => setEditing({ ...editing, [stat.key]: Math.max(1, statValue - 1) })}
-                                                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 font-bold hover:bg-slate-100 active:scale-95 transition-all flex items-center justify-center"
+                                                        className={cn("w-8 h-8 rounded-lg border font-bold active:scale-95 transition-all flex items-center justify-center",
+                                                            actualTheme === 'dark'
+                                                                ? "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700"
+                                                                : "bg-white border-slate-200 text-slate-400 hover:bg-slate-100"
+                                                        )}
                                                     >
                                                         -
                                                     </button>
-                                                    <div className="flex-1 relative h-2 bg-slate-200 rounded-full overflow-hidden mx-2">
+                                                    <div className={cn("flex-1 relative h-2 rounded-full overflow-hidden mx-2",
+                                                        actualTheme === 'dark' ? "bg-slate-700" : "bg-slate-200"
+                                                    )}>
                                                         <div
                                                             className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all"
                                                             style={{ width: `${(statValue / 10) * 100}%` }}
@@ -1015,12 +1357,18 @@ export default function PlayerEditor() {
                                                     </div>
                                                     <button
                                                         onClick={() => setEditing({ ...editing, [stat.key]: Math.min(10, statValue + 1) })}
-                                                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-blue-500 font-bold hover:bg-blue-50 active:scale-95 transition-all flex items-center justify-center"
+                                                        className={cn("w-8 h-8 rounded-lg border text-blue-500 font-bold active:scale-95 transition-all flex items-center justify-center",
+                                                            actualTheme === 'dark'
+                                                                ? "bg-slate-800 border-slate-700 hover:bg-blue-900/30"
+                                                                : "bg-white border-slate-200 hover:bg-blue-50"
+                                                        )}
                                                     >
                                                         +
                                                     </button>
                                                 </div>
-                                                <span className="text-xl font-black text-slate-900 tabular-nums w-8 text-right">
+                                                <span className={cn("text-xl font-black tabular-nums w-8 text-right",
+                                                    actualTheme === 'dark' ? "text-slate-100" : "text-slate-900"
+                                                )}>
                                                     {statValue}
                                                 </span>
                                             </div>
@@ -1031,10 +1379,16 @@ export default function PlayerEditor() {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="sticky bottom-0 bg-white border-t border-slate-100 p-4 flex gap-3">
+                        <div className={cn("sticky bottom-0 border-t p-4 flex gap-3",
+                            actualTheme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                        )}>
                             <button
                                 onClick={handleCancelEdit}
-                                className="flex-1 px-4 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors"
+                                className={cn("flex-1 px-4 py-3 rounded-xl font-bold transition-colors",
+                                    actualTheme === 'dark'
+                                        ? "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                )}
                             >
                                 취소
                             </button>

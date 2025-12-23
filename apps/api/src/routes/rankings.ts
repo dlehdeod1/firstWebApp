@@ -22,6 +22,10 @@ interface PlayerStats {
     winRate: number
     attendance: number
     streak: number
+    key_passes: number
+    blocks: number
+    clearances: number
+    defenses: number // Total defensive actions
 }
 
 // Helper to calculate all stats
@@ -47,17 +51,34 @@ const calculateRankings = async (DB: D1Database) => {
             ppm: 0,
             winRate: 0,
             attendance: 0,
-            streak: 0
+            streak: 0,
+            key_passes: 0,
+            blocks: 0,
+            clearances: 0,
+            defenses: 0
         }
     })
 
-    // 2. Statistics (Goals/Assists) - Global Sum
-    const statsAttr = await DB.prepare('SELECT player_id, SUM(goals) as goals, SUM(assists) as assists FROM player_match_stats GROUP BY player_id').all<{ player_id: number, goals: number, assists: number }>()
+    // 2. Statistics (Goals/Assists/Defensive) - Global Sum
+    const statsAttr = await DB.prepare(`
+        SELECT player_id, 
+               COALESCE(SUM(goals), 0) as goals, 
+               COALESCE(SUM(assists), 0) as assists,
+               COALESCE(SUM(key_passes), 0) as key_passes,
+               COALESCE(SUM(blocks), 0) as blocks,
+               COALESCE(SUM(clearances), 0) as clearances
+        FROM player_match_stats 
+        GROUP BY player_id
+    `).all<{ player_id: number, goals: number, assists: number, key_passes: number, blocks: number, clearances: number }>()
     statsAttr.results?.forEach(s => {
         if (playerMap[s.player_id]) {
             playerMap[s.player_id].goals = s.goals
             playerMap[s.player_id].assists = s.assists
             playerMap[s.player_id].points = s.goals + s.assists
+            playerMap[s.player_id].key_passes = s.key_passes || 0
+            playerMap[s.player_id].blocks = s.blocks || 0
+            playerMap[s.player_id].clearances = s.clearances || 0
+            playerMap[s.player_id].defenses = (s.blocks || 0) + (s.clearances || 0)
         }
     })
 
@@ -283,6 +304,21 @@ rankings.get('/hall-of-fame', async (c) => {
             .slice(0, 3)
             .map((p, i) => ({ player_name: p.name, value: (p as any).defenses || 0, rank: i + 1 }))
 
+        // PPM ranking (20+ games, sorted by points per match)
+        const ppmRanking = allStats
+            .filter(p => p.games >= 20)
+            .sort((a, b) => {
+                const ppmA = a.games > 0 ? a.points / a.games : 0
+                const ppmB = b.games > 0 ? b.points / b.games : 0
+                return ppmB - ppmA
+            })
+            .slice(0, 3)
+            .map((p, i) => ({
+                player_name: p.name,
+                value: p.games > 0 ? Math.round((p.points / p.games) * 100) / 100 : 0,
+                rank: i + 1
+            }))
+
         return c.json({
             goals: {
                 entries: (goalsRes.results || []).map((r, i) => ({ ...r, rank: i + 1, year: yearNum }))
@@ -292,6 +328,9 @@ rankings.get('/hall-of-fame', async (c) => {
             },
             points: {
                 entries: pointsRanking.map(r => ({ ...r, year: yearNum }))
+            },
+            ppm: {
+                entries: ppmRanking.map(r => ({ ...r, year: yearNum }))
             },
             wins: {
                 entries: winsRanking.map(r => ({ ...r, year: yearNum }))

@@ -3,40 +3,60 @@ import { Link } from 'react-router-dom'
 import { Calendar, Users, MapPin, ChevronRight, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+const API_URL = import.meta.env.VITE_API_URL || 'https://conerkicks-api.conerkicks.workers.dev'
 
-function getSeasonTitle(dateStr: string) {
+function getSeasonInfo(dateStr: string): { weekNum: number, total: number, year: number } {
     const date = new Date(dateStr)
     const year = date.getFullYear()
 
-    // Find 1st Wednesday of the year
-    const firstJan = new Date(year, 0, 1)
-    const day = firstJan.getDay()
-    const diff = (3 - day + 7) % 7 // Distance to next Wednesday (0=Sun, 3=Wed)
-    const firstWed = new Date(year, 0, 1 + diff)
+    // Calculate total Wednesdays in the year
+    const getWednesdaysInYear = (y: number) => {
+        let count = 0
+        const d = new Date(y, 0, 1) // Jan 1
+        while (d.getFullYear() === y) {
+            if (d.getDay() === 3) count++ // 3 = Wednesday
+            d.setDate(d.getDate() + 1)
+        }
+        return count
+    }
+    const totalWednesdays = getWednesdaysInYear(year)
 
-    // Calculate difference in weeks
-    const msDiff = date.getTime() - firstWed.getTime()
-    if (msDiff < 0) return `${year} 프리시즌` // Before first Wed
+    // ISO week calculation: Week 1 is the week with Jan 4th
+    const jan4 = new Date(year, 0, 4)
+    const dayOfWeek = jan4.getDay() || 7 // Convert Sunday 0 to 7
+    const week1Start = new Date(jan4)
+    week1Start.setDate(jan4.getDate() - dayOfWeek + 1) // Monday of week 1
+    // Calculate week difference
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000
+    const weekNum = Math.ceil((date.getTime() - week1Start.getTime()) / msPerWeek)
+    return { weekNum: Math.max(1, Math.min(totalWednesdays, weekNum)), total: totalWednesdays, year }
+}
 
-    const weekNum = Math.floor(msDiff / (7 * 24 * 60 * 60 * 1000)) + 1
-    return `${year}시즌 ${weekNum}경기`
+function getDayName(dateStr: string): string {
+    const days = ['일', '월', '화', '수', '목', '금', '토']
+    return days[new Date(dateStr).getDay()]
 }
 
 function SessionCard({ session }: { session: any }) {
     const isRecruiting = session.status === 'recruiting'
     const isClosed = session.status === 'closed'
-    const dateTitle = getSeasonTitle(session.session_date)
+    const { weekNum, total, year } = getSeasonInfo(session.session_date)
+    const dayName = getDayName(session.session_date)
 
     return (
         <Link to={`/sessions/${session.id}`} className="group block bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-100 transition-all">
             <div className="flex justify-between items-start mb-4">
-                <div className={cn(
-                    "px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider",
-                    isRecruiting ? "bg-blue-50 text-blue-600" :
-                        isClosed ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-600"
-                )}>
-                    {session.status === 'recruiting' ? '모집중' : session.status === 'closed' ? '마감' : '종료'}
+                <div className="flex items-center gap-2">
+                    <div className={cn(
+                        "px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider",
+                        isRecruiting ? "bg-blue-50 text-blue-600" :
+                            isClosed ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-600"
+                    )}>
+                        {session.status === 'recruiting' ? '모집중' : session.status === 'closed' ? '마감' : '종료'}
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">
+                        {weekNum}/{total}
+                    </span>
                 </div>
                 {isRecruiting && (
                     <span className="flex h-3 w-3 relative">
@@ -47,17 +67,17 @@ function SessionCard({ session }: { session: any }) {
             </div>
 
             <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">
-                {dateTitle}
+                {year}시즌 {weekNum}경기
             </h3>
 
             <div className="space-y-2 text-sm text-slate-500 mb-6">
                 <div className="flex items-center gap-2">
                     <Calendar size={14} />
-                    <span>{session.session_date} (수) 20:00</span>
+                    <span>{session.session_date} ({dayName}) 20:00</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <MapPin size={14} />
-                    <span>경북대 풋살장 A구장</span>
+                    <span>수성대학교 2번구장</span>
                 </div>
             </div>
 

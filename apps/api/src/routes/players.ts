@@ -79,7 +79,8 @@ players.get('/', async (c) => {
 // CREATE Player
 players.post('/', async (c) => {
     if (!await checkAdmin(c)) return c.json({ error: 'Unauthorized' }, 401)
-    const { name } = await c.req.json()
+    const body = await c.req.json()
+    const { name, shooting, offball_run, ball_keeping, passing, intercept, marking, stamina, speed, physical, linkup } = body
 
     if (!name) return c.json({ error: 'Name is required' }, 400)
 
@@ -92,9 +93,13 @@ players.post('/', async (c) => {
     // Generate Random 6-char Code
     const playerCode = Math.random().toString(36).substring(2, 8).toUpperCase()
 
-    const res = await c.env.DB.prepare('INSERT INTO players (name, player_code, link_status, created_at, updated_at) VALUES (?, ?, ?, unixepoch(), unixepoch()) RETURNING id')
-        .bind(name, playerCode, 'NONE')
-        .first()
+    const res = await c.env.DB.prepare(`
+        INSERT INTO players (name, player_code, link_status, shooting, offball_run, ball_keeping, passing, intercept, marking, stamina, speed, physical, linkup, created_at, updated_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch()) RETURNING id
+    `).bind(
+        name, playerCode, 'NONE',
+        shooting || 50, offball_run || 50, ball_keeping || 50, passing || 50, intercept || 50, marking || 50, stamina || 50, speed || 50, physical || 50, linkup || 50
+    ).first()
     return c.json({ id: res?.id, success: true })
 })
 

@@ -43,9 +43,15 @@ export default function MainLayout() {
             <nav
                 className={cn(
                     "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
-                    scrolled
-                        ? "bg-white/80 backdrop-blur-md border-slate-200 shadow-sm py-3"
-                        : "bg-transparent border-transparent py-5"
+                    actualTheme === 'dark' ? (
+                        scrolled
+                            ? "bg-slate-800/90 backdrop-blur-md border-slate-700 shadow-sm py-3"
+                            : "bg-transparent border-transparent py-5"
+                    ) : (
+                        scrolled
+                            ? "bg-white/80 backdrop-blur-md border-slate-200 shadow-sm py-3"
+                            : "bg-transparent border-transparent py-5"
+                    )
                 )}
             >
                 <div className="max-w-7xl mx-auto px-4 md:px-6">
@@ -62,7 +68,12 @@ export default function MainLayout() {
                         </Link>
 
                         {/* Desktop Menu */}
-                        <div className="hidden md:flex items-center gap-1 bg-white/50 backdrop-blur-sm px-2 py-1.5 rounded-full border border-slate-200/60 shadow-sm">
+                        <div className={cn(
+                            "hidden md:flex items-center gap-1 backdrop-blur-sm px-2 py-1.5 rounded-full border shadow-sm",
+                            actualTheme === 'dark'
+                                ? "bg-slate-800/50 border-slate-700/60"
+                                : "bg-white/50 border-slate-200/60"
+                        )}>
                             {navItems.map((item) => {
                                 const Icon = item.icon
                                 const isActive = location.pathname === item.path
@@ -72,9 +83,15 @@ export default function MainLayout() {
                                         to={item.path}
                                         className={cn(
                                             "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
-                                            isActive
-                                                ? "bg-slate-900 text-white shadow-md"
-                                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                                            actualTheme === 'dark' ? (
+                                                isActive
+                                                    ? "bg-blue-600 text-white shadow-md"
+                                                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                                            ) : (
+                                                isActive
+                                                    ? "bg-slate-900 text-white shadow-md"
+                                                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                                            )
                                         )}
                                     >
                                         <Icon size={16} />
@@ -83,20 +100,34 @@ export default function MainLayout() {
                                 )
                             })}
 
-                            {/* Admin Links */}
-                            {['ADMIN', 'OWNER', 'admin', 'owner'].includes(localStorage.getItem('user_role') || '') && (
-                                <Link
-                                    to="/admin/players"
-                                    className={cn(
-                                        "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
-                                        location.pathname === '/admin/players'
-                                            ? "bg-blue-600 text-white shadow-md"
-                                            : "text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700"
-                                    )}
-                                >
-                                    <User size={16} />
-                                    선수관리
-                                </Link>
+                            {/* Player List - visible to all logged-in non-GUEST users */}
+                            {localStorage.getItem('auth_token') && localStorage.getItem('user_role') !== 'GUEST' && (
+                                <>
+                                    <Link
+                                        to="/admin/players"
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
+                                            location.pathname === '/admin/players'
+                                                ? "bg-blue-600 text-white shadow-md"
+                                                : "text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700"
+                                        )}
+                                    >
+                                        <User size={16} />
+                                        선수명단
+                                    </Link>
+                                    <Link
+                                        to="/ratings"
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
+                                            location.pathname === '/ratings'
+                                                ? "bg-amber-500 text-white shadow-md"
+                                                : "text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-700"
+                                        )}
+                                    >
+                                        <Star size={16} />
+                                        능력치평가
+                                    </Link>
+                                </>
                             )}
 
                             {/* Dark Mode Toggle */}
@@ -111,7 +142,10 @@ export default function MainLayout() {
 
                         {/* Mobile Menu Button */}
                         <button
-                            className="md:hidden p-2 text-slate-600"
+                            className={cn(
+                                "md:hidden p-2 transition-colors",
+                                actualTheme === 'dark' ? "text-slate-300" : "text-slate-600"
+                            )}
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         >
                             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -121,32 +155,67 @@ export default function MainLayout() {
 
                 {/* Mobile Menu Overlay */}
                 {mobileMenuOpen && (
-                    <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-slate-100 shadow-xl p-4 flex flex-col gap-2">
+                    <div className={cn(
+                        "md:hidden absolute top-full left-0 right-0 border-b shadow-xl p-4 flex flex-col gap-2",
+                        actualTheme === 'dark'
+                            ? "bg-slate-800 border-slate-700"
+                            : "bg-white border-slate-100"
+                    )}>
                         {navItems.map((item) => (
                             <Link
                                 key={item.path}
                                 to={item.path}
                                 onClick={() => setMobileMenuOpen(false)}
-                                className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 text-slate-700 font-medium"
+                                className={cn(
+                                    "flex items-center gap-3 p-3 rounded-lg font-medium transition-colors",
+                                    actualTheme === 'dark'
+                                        ? "text-slate-200 hover:bg-slate-700"
+                                        : "text-slate-700 hover:bg-slate-50"
+                                )}
                             >
                                 <item.icon size={20} />
                                 {item.name}
                             </Link>
                         ))}
-                        <div className="h-px bg-slate-100 my-2" />
+                        <div className={cn(
+                            "h-px my-2",
+                            actualTheme === 'dark' ? "bg-slate-700" : "bg-slate-100"
+                        )} />
                         <Link
                             to="/sessions/new"
                             onClick={() => setMobileMenuOpen(false)}
-                            className="p-3 text-sm text-slate-500 hover:text-blue-600 block"
+                            className={cn(
+                                "p-3 text-sm block transition-colors",
+                                actualTheme === 'dark'
+                                    ? "text-slate-400 hover:text-blue-400"
+                                    : "text-slate-500 hover:text-blue-600"
+                            )}
                         >
                             세션 관리 (Admin)
                         </Link>
                         <Link
                             to="/admin/players"
                             onClick={() => setMobileMenuOpen(false)}
-                            className="p-3 text-sm text-slate-500 hover:text-blue-600 block"
+                            className={cn(
+                                "p-3 text-sm block transition-colors",
+                                actualTheme === 'dark'
+                                    ? "text-slate-400 hover:text-blue-400"
+                                    : "text-slate-500 hover:text-blue-600"
+                            )}
                         >
-                            선수 관리 (Admin)
+                            선수명단
+                        </Link>
+                        <Link
+                            to="/ratings"
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={cn(
+                                "p-3 text-sm block transition-colors",
+                                actualTheme === 'dark'
+                                    ? "text-amber-400 hover:text-amber-300"
+                                    : "text-amber-500 hover:text-amber-600"
+                            )}
+                        >
+                            ⭐ 능력치평가
                         </Link>
                     </div>
                 )}
@@ -158,22 +227,38 @@ export default function MainLayout() {
             </main>
 
             {/* Footer */}
-            <footer className="bg-white border-t border-slate-100 py-8 mt-auto">
+            <footer className={cn(
+                "border-t py-8 mt-auto transition-colors",
+                actualTheme === 'dark'
+                    ? "bg-slate-800 border-slate-700"
+                    : "bg-white border-slate-100"
+            )}>
                 <div className="max-w-7xl mx-auto px-4 text-center">
-                    <p className="text-slate-400 text-sm mb-4">© 2025 Corner Kicks ⚽</p>
+                    <p className={cn(
+                        "text-sm mb-4",
+                        actualTheme === 'dark' ? "text-slate-400" : "text-slate-400"
+                    )}>© 2025 Corner Kicks ⚽</p>
                     {localStorage.getItem('auth_token') ? (
                         <button
                             onClick={() => {
                                 localStorage.clear()
                                 window.location.href = '/'
                             }}
-                            className="text-xs text-red-500 underline font-medium"
+                            className="text-xs text-red-500 underline font-medium hover:text-red-600"
                         >
-                            관리자 로그아웃
+                            로그아웃
                         </button>
                     ) : (
-                        <Link to="/login" className="text-xs text-slate-300 hover:text-slate-500 underline">
-                            관리자 로그인
+                        <Link
+                            to="/login"
+                            className={cn(
+                                "text-xs underline",
+                                actualTheme === 'dark'
+                                    ? "text-slate-400 hover:text-slate-300"
+                                    : "text-slate-300 hover:text-slate-500"
+                            )}
+                        >
+                            로그인
                         </Link>
                     )}
                 </div>

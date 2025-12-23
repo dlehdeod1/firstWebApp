@@ -65,71 +65,177 @@ sessions.post('/:id/teams/generate', async (c) => {
     try {
         const sessionId = c.req.param('id')
         const { numTeams } = await c.req.json()
+        const teamCount = numTeams || 3
 
-        // 1. Fetch attendees
+        // 1. Fetch attendees with all stats
         const { results: players } = await c.env.DB.prepare(`
-            SELECT p.* FROM players p
+            SELECT p.id, p.name, p.shooting, p.offball_run, p.ball_keeping, p.passing, 
+                   p.intercept, p.marking, p.stamina, p.speed, p.physical, p.linkup,
+                   p.join_date
+            FROM players p
             JOIN attendance a ON p.id = a.player_id
             WHERE a.session_id = ?
-        `).bind(sessionId).all<PlayerStats>()
+        `).bind(sessionId).all<any>()
 
         if (!players || players.length === 0) {
             return c.json({ error: 'No players found for this session' }, 400)
         }
 
-        // 2. Fetch Chemistry & Preferences
-        const { results: staticChem } = await c.env.DB.prepare('SELECT * FROM chemistry_edges').all<any>()
-        const { results: prefs } = await c.env.DB.prepare('SELECT player_id, target_player_id, rank FROM player_preferences').all<any>()
+        // 2. Fetch Player Preferences (who likes playing with whom)
+        const playerIds = players.map(p => p.id)
+        const { results: prefs } = await c.env.DB.prepare(`
+            SELECT pp.player_id, pp.target_player_id, pp.rank, p1.name as player_name, p2.name as target_name
+            FROM player_preferences pp
+            JOIN players p1 ON pp.player_id = p1.id
+            JOIN players p2 ON pp.target_player_id = p2.id
+            WHERE pp.player_id IN (${playerIds.join(',')})
+        `).all<any>()
 
-        const chemMap = new Map<string, number>()
+        // 3. Build player data for AI prompt
+        const playerData = players.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            슈팅: p.shooting || 50,
+            침투: p.offball_run || 50,
+            킵: p.ball_keeping || 50,
+            패스: p.passing || 50,
+            차단: p.intercept || 50,
+            마킹: p.marking || 50,
+            스태미나: p.stamina || 50,
+            스피드: p.speed || 50,
+            피지컬: p.physical || 50,
+            연계: p.linkup || 50,
+            overall: Math.round(((p.shooting || 50) + (p.offball_run || 50) + (p.ball_keeping || 50) +
+                (p.passing || 50) + (p.intercept || 50) + (p.marking || 50) +
+                (p.stamina || 50) + (p.speed || 50) + (p.physical || 50) + (p.linkup || 50)) / 10)
+        }))
 
-        // Static
-        staticChem?.forEach(c => {
-            const key = [c.player_a_id, c.player_b_id].sort((a, b) => a - b).join('-')
-            chemMap.set(key, (chemMap.get(key) || 0) + c.score)
-        })
+        // Build preferences info
+        const prefsInfo = (prefs || []).map((p: any) =>
+            `${p.player_name}→${p.target_name}(${p.rank}순위)`
+        ).join(', ')
 
-        // Preferences (Rank 1=+5, 2=+3, 3=+1)
-        prefs?.forEach(p => {
-            const score = p.rank === 1 ? 5 : p.rank === 2 ? 3 : 1
-            const key = [p.player_id, p.target_player_id].sort((a: number, b: number) => a - b).join('-')
-            chemMap.set(key, (chemMap.get(key) || 0) + score)
-        })
+        // 4. Try Gemini AI for team generation
+        let namedTeams: any[] = []
+        let aiGenerated = false
+        let balanceScore = 0
+        let logs: string[] = []
 
-        const combinedChemistry = Array.from(chemMap.entries()).map(([key, score]) => {
-            const [p1, p2] = key.split('-').map(Number)
-            return { player_a_id: p1, player_b_id: p2, score }
-        })
+        const apiKey = (c.env as any).GEMINI_API_KEY
+        if (apiKey) {
+            try {
+                // Calculate total OVR sum for reference
+                const totalOVR = playerData.reduce((sum, p) => sum + p.overall, 0)
+                const targetOVRPerTeam = Math.round(totalOVR / teamCount)
 
-        // 3. Generate Teams
-        const balancer = new TeamBalancer(players, combinedChemistry)
-        const result = balancer.generate(numTeams || 3)
+                const prompt = `당신은 축구팀 구성 및 전략 전문가입니다. 팀 밸런스가 가장 중요합니다.
 
-        // Custom Naming Logic: Oldest Member
-        const namedTeams = result.teams.map((team: any, index: number) => {
-            let name = `Team ${String.fromCharCode(65 + index)}`
-            if (team.players.length > 0) {
-                // Sort by join_date (asc), then name (asc)
-                // Use specific date parsing or simple string check
-                const sorted = [...team.players].sort((a: any, b: any) => {
-                    const dA = a.join_date ? new Date(a.join_date).getTime() : 9999999999999
-                    const dB = b.join_date ? new Date(b.join_date).getTime() : 9999999999999
-                    if (Number.isNaN(dA)) return 1 // Handle invalid date
-                    if (Number.isNaN(dB)) return -1
-                    if (dA !== dB) return dA - dB
-                    return a.name.localeCompare(b.name)
+## 선수 목록 (${players.length}명) - 총 OVR 합계: ${totalOVR}
+${playerData.map((p, i) => `${i + 1}. ${p.name} (OVR:${p.overall}) - 슈팅:${p.슈팅} 침투:${p.침투} 킵:${p.킵} 패스:${p.패스} 차단:${p.차단} 마킹:${p.마킹} 스태:${p.스태미나} 스피드:${p.스피드} 피지컬:${p.피지컬} 연계:${p.연계}`).join('\\n')}
+
+## 선수 선호도 (같은 팀 희망)
+${prefsInfo || '없음'}
+
+## 중요한 요청사항
+1. **팀 밸런스 최우선**: 각 팀의 OVR 합계가 ${targetOVRPerTeam} (± 5) 범위 내가 되도록 구성하세요.
+2. **인원 균형**: 각 팀에 ${Math.floor(players.length / teamCount)}~${Math.ceil(players.length / teamCount)}명씩 배정하세요.
+3. **핵심선수**: 각 팀에서 *가장 OVR이 높은 선수*를 핵심선수로 지정하세요.
+4. 선호도가 있는 선수는 가급적 같은 팀으로 배정하세요.
+5. 팀명은 해당 팀에서 가장 경험 많은 선수 이름 + "팀"으로 지정하세요.
+
+## 응답 형식 (JSON만)
+{
+  "teams": [
+    {"name":"OOO팀", "players":["선수1","선수2",...], "teamOVR":팀OVR합계숫자, "type":"공격형/수비형/점유형/체력형/밸런스형", "emoji":"⚽", "strategy":"2문장 전략", "keyPlayer":"핵심선수(OVR최고)", "keyPlayerReason":"OVR XX로 팀 최고"}
+  ],
+  "balanceScore": 85
+}
+balanceScore는 팀간 OVR 편차가 적을수록 높게 (90점 이상이 좋음).
+JSON만 응답하세요.`
+
+                const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+                    })
                 })
-                if (sorted.length > 0) {
-                    name = `${sorted[0].name}팀`
-                }
-            }
-            return { ...team, name }
-        })
 
-        // 4. Save to DB (Transaction-like)
-        // Clear existing teams/matches first (Overwrite)
-        // Dependent records must be deleted first to avoid FK violations
-        // Order: player_match_stats -> matches -> team_members -> teams
+                if (geminiRes.ok) {
+                    const geminiData = await geminiRes.json() as any
+                    const responseText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+                    console.log('Gemini Response Text:', responseText.substring(0, 500))
+                    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+                    if (jsonMatch) {
+                        const aiResult = JSON.parse(jsonMatch[0])
+                        console.log('AI Result teams count:', aiResult.teams?.length)
+                        if (aiResult.teams && Array.isArray(aiResult.teams)) {
+                            // Map player names to player objects
+                            namedTeams = aiResult.teams.map((team: any, idx: number) => {
+                                const teamPlayers = (team.players || []).map((name: string) =>
+                                    players.find((p: any) => p.name === name)
+                                ).filter(Boolean)
+
+                                return {
+                                    id: String.fromCharCode(65 + idx),
+                                    name: team.name || `Team ${String.fromCharCode(65 + idx)}`,
+                                    players: teamPlayers,
+                                    type: team.type,
+                                    emoji: team.emoji,
+                                    strategy: team.strategy,
+                                    keyPlayer: team.keyPlayer,
+                                    keyPlayerReason: team.keyPlayerReason,
+                                    stats: calculateTeamStatsSimple(teamPlayers)
+                                }
+                            })
+                            balanceScore = aiResult.balanceScore || 80
+                            aiGenerated = true
+                            logs.push('AI가 팀을 구성했습니다.')
+                            console.log('AI Team Generation SUCCESS, teams:', namedTeams.length)
+                        }
+                    } else {
+                        console.log('JSON match failed for response')
+                    }
+                } else {
+                    const errText = await geminiRes.text()
+                    console.error('Gemini API Error:', geminiRes.status, errText.substring(0, 300))
+                    logs.push(`Gemini API 에러: ${geminiRes.status}`)
+                }
+            } catch (aiError: any) {
+                console.error('AI Team Generation failed, falling back to algorithm:', aiError.message)
+                logs.push('AI 처리 실패: ' + aiError.message)
+            }
+        } else {
+            console.log('No GEMINI_API_KEY found, using algorithm')
+            logs.push('API Key 없음, 알고리즘 사용')
+        }
+
+        // 5. Fallback to TeamBalancer algorithm if AI failed
+        if (!aiGenerated || namedTeams.length === 0) {
+            const balancer = new TeamBalancer(players, [])
+            const result = balancer.generate(teamCount)
+
+            namedTeams = result.teams.map((team: any, index: number) => {
+                let name = `Team ${String.fromCharCode(65 + index)}`
+                if (team.players.length > 0) {
+                    const sorted = [...team.players].sort((a: any, b: any) => {
+                        const dA = a.join_date ? new Date(a.join_date).getTime() : 9999999999999
+                        const dB = b.join_date ? new Date(b.join_date).getTime() : 9999999999999
+                        if (Number.isNaN(dA)) return 1
+                        if (Number.isNaN(dB)) return -1
+                        if (dA !== dB) return dA - dB
+                        return a.name.localeCompare(b.name)
+                    })
+                    if (sorted.length > 0) name = `${sorted[0].name}팀`
+                }
+                return { ...team, name }
+            })
+            balanceScore = result.balanceScore
+            logs = result.logs
+        }
+
+        // 6. Save to DB
         await c.env.DB.batch([
             c.env.DB.prepare('DELETE FROM player_match_stats WHERE match_id IN (SELECT id FROM matches WHERE session_id = ?)').bind(sessionId),
             c.env.DB.prepare('DELETE FROM matches WHERE session_id = ?').bind(sessionId),
@@ -137,45 +243,46 @@ sessions.post('/:id/teams/generate', async (c) => {
             c.env.DB.prepare('DELETE FROM teams WHERE session_id = ?').bind(sessionId)
         ])
 
-        // Insert Teams and Members
         const teamIds: number[] = []
-        const validPlayerIds = new Set(players.map(p => p.id))
+        const validPlayerIds = new Set(players.map((p: any) => p.id))
 
         for (const team of namedTeams) {
-            const res = await c.env.DB.prepare('INSERT INTO teams (session_id, name) VALUES (?, ?) RETURNING id')
-                .bind(sessionId, team.name)
+            const scoreStats = team.type ? JSON.stringify({
+                type: team.type,
+                emoji: team.emoji,
+                strategy: team.strategy,
+                keyPlayer: team.keyPlayer,
+                keyPlayerReason: team.keyPlayerReason
+            }) : null
+
+            const res = await c.env.DB.prepare('INSERT INTO teams (session_id, name, score_stats) VALUES (?, ?, ?) RETURNING id')
+                .bind(sessionId, team.name, scoreStats)
                 .first()
             if (res && res.id) {
                 const teamId = res.id as number
                 teamIds.push(teamId)
 
-                // Filter to only include valid players that exist in DB
                 const validPlayers = team.players.filter((p: any) => validPlayerIds.has(p.id))
                 if (validPlayers.length > 0) {
                     const stmt = c.env.DB.prepare('INSERT INTO team_members (team_id, player_id) VALUES (?, ?)')
-                    const batch = validPlayers.map((p: any) => stmt.bind(teamId, p.id))
-                    await c.env.DB.batch(batch)
+                    await c.env.DB.batch(validPlayers.map((p: any) => stmt.bind(teamId, p.id)))
                 }
             }
         }
 
-        // 5. Generate Matches (9 Matches for 3 teams: AB, BC, CA x 3)
+        // 7. Generate Matches
         const matches = []
         if (teamIds.length === 3) {
-            const [a, b, c] = teamIds
-            // Cycle: A-B, B-C, C-A
+            const [teamA, teamB, teamC] = teamIds
             const cycle = [
-                { t1: a, t2: b },
-                { t1: b, t2: c },
-                { t1: c, t2: a }
+                { t1: teamA, t2: teamB },
+                { t1: teamB, t2: teamC },
+                { t1: teamC, t2: teamA }
             ]
-            // 9 Matches
-            for (let i = 0; i < 3; i++) {
-                matches.push(...cycle)
-            }
+            for (let i = 0; i < 3; i++) matches.push(...cycle)
         } else if (teamIds.length === 2) {
-            const [a, b] = teamIds
-            for (let i = 0; i < 5; i++) matches.push({ t1: a, t2: b })
+            const [tA, tB] = teamIds
+            for (let i = 0; i < 5; i++) matches.push({ t1: tA, t2: tB })
         }
 
         if (matches.length > 0) {
@@ -183,76 +290,33 @@ sessions.post('/:id/teams/generate', async (c) => {
             await c.env.DB.batch(matches.map((m, idx) => stmt.bind(sessionId, m.t1, m.t2, idx + 1)))
         }
 
-        // 6. AI Analysis (optional, don't fail if it errors)
-        let aiAnalysis: any[] = []
-        try {
-            const apiKey = (c.env as any).GEMINI_API_KEY
-            if (apiKey && namedTeams.length > 0) {
-                // Prepare team data
-                const teamData = namedTeams.map((t: any) => {
-                    const avgShooting = t.players.length ? Math.round(t.players.reduce((s: number, p: any) => s + (p.shooting || 50), 0) / t.players.length) : 50
-                    const avgPassing = t.players.length ? Math.round(t.players.reduce((s: number, p: any) => s + (p.passing || 50), 0) / t.players.length) : 50
-                    const avgStamina = t.players.length ? Math.round(t.players.reduce((s: number, p: any) => s + (p.stamina || 50), 0) / t.players.length) : 50
-                    const avgSpeed = t.players.length ? Math.round(t.players.reduce((s: number, p: any) => s + (p.speed || 50), 0) / t.players.length) : 50
-                    return {
-                        teamName: t.name,
-                        players: t.players.map((p: any) => p.name),
-                        stats: { avgShooting, avgPassing, avgStamina, avgSpeed }
-                    }
-                })
-
-                const prompt = `당신은 축구 전략 전문가입니다. 아래 팀 구성을 분석하고 각 팀에 맞는 전략을 추천해주세요.
-
-팀 정보:
-${teamData.map((t: any, i: number) => `팀${i + 1}. ${t.teamName} - 선수: ${t.players.join(', ')} - 슈팅:${t.stats.avgShooting} 패스:${t.stats.avgPassing} 스태미나:${t.stats.avgStamina} 스피드:${t.stats.avgSpeed}`).join('\n')}
-
-각 팀에 대해 JSON 형식으로 응답: [{"teamName":"팀명","type":"공격형/수비형/점유형/체력형/밸런스형","emoji":"이모지","strategy":"2문장 전략","keyPlayer":"핵심선수","keyPlayerReason":"이유"}]
-JSON만 응답.`
-
-                const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
-                    })
-                })
-
-                if (geminiRes.ok) {
-                    const geminiData = await geminiRes.json() as any
-                    const responseText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-                    const jsonMatch = responseText.match(/\[[\s\S]*\]/)
-                    if (jsonMatch) {
-                        aiAnalysis = JSON.parse(jsonMatch[0])
-
-                        // Save AI analysis to each team's score_stats
-                        for (let i = 0; i < teamIds.length && i < namedTeams.length; i++) {
-                            const teamAnalysis = aiAnalysis.find((a: any) => a.teamName === namedTeams[i].name)
-                            if (teamAnalysis) {
-                                await c.env.DB.prepare('UPDATE teams SET score_stats = ? WHERE id = ?')
-                                    .bind(JSON.stringify(teamAnalysis), teamIds[i])
-                                    .run()
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (aiError) {
-            console.error('AI Analysis failed (non-critical):', aiError)
-        }
-
         return c.json({
             success: true,
             teams: namedTeams,
             match_count: matches.length,
-            balanceScore: result.balanceScore,
-            logs: result.logs
+            balanceScore,
+            logs,
+            aiGenerated
         })
     } catch (e: any) {
         console.error('GENERATE ERROR:', e)
         return c.json({ error: e.message, stack: e.stack }, 500)
     }
 })
+
+// Helper function for simple team stats calculation
+function calculateTeamStatsSimple(players: any[]) {
+    let attack = 0, mid = 0, def = 0, base = 0, physical = 0, total = 0
+    for (const p of players) {
+        attack += (p.shooting || 50) + (p.offball_run || 50)
+        mid += (p.ball_keeping || 50) + (p.passing || 50)
+        def += (p.intercept || 50) + (p.marking || 50)
+        base += (p.stamina || 50) + (p.speed || 50)
+        physical += (p.physical || 50)
+        total += attack + mid + def + base + physical
+    }
+    return { attack, mid, def, base, physical, total }
+}
 
 // AI TEAM ANALYSIS using Gemini
 sessions.post('/:id/teams/analyze', async (c) => {
@@ -379,6 +443,24 @@ sessions.post('/:id/teams/assign', async (c) => {
     return c.json({ success: true })
 })
 
+// UPDATE Team Name (manual override)
+sessions.put('/:id/teams/:teamId', async (c) => {
+    const teamId = c.req.param('teamId')
+    const { name } = await c.req.json()
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return c.json({ error: 'Team name is required' }, 400)
+    }
+
+    try {
+        await c.env.DB.prepare('UPDATE teams SET name = ? WHERE id = ?').bind(name.trim(), teamId).run()
+        return c.json({ success: true })
+    } catch (e) {
+        console.error(e)
+        return c.json({ error: 'Failed to update team name' }, 500)
+    }
+})
+
 
 
 // GET All Sessions
@@ -439,11 +521,28 @@ sessions.get('/:id', async (c) => {
     // Matches
     const { results: matches } = await c.env.DB.prepare('SELECT * FROM matches WHERE session_id = ?').bind(id).all()
 
+    // Match Stats - aggregate player stats for this session's matches (for MVP calculation)
+    const { results: matchStats } = await c.env.DB.prepare(`
+        SELECT 
+            pms.player_id,
+            p.name as player_name,
+            SUM(pms.goals) as goals,
+            SUM(pms.assists) as assists,
+            SUM(pms.key_passes) as key_passes,
+            SUM(pms.blocks) as blocks,
+            SUM(pms.clearances) as clearances
+        FROM player_match_stats pms
+        JOIN players p ON pms.player_id = p.id
+        WHERE pms.match_id IN (SELECT id FROM matches WHERE session_id = ?)
+        GROUP BY pms.player_id
+    `).bind(id).all()
+
     return c.json({
         ...session,
         players: players || [],
         teams: teamsWithMembers || [],
-        matches: matches || []
+        matches: matches || [],
+        matchStats: matchStats || []
     })
 })
 
@@ -515,8 +614,28 @@ sessions.delete('/:id', async (c) => {
 // Clear Matches
 sessions.delete('/:id/matches', async (c) => {
     const sessionId = c.req.param('id')
-    await c.env.DB.prepare('DELETE FROM matches WHERE session_id = ?').bind(sessionId).run()
-    return c.json({ success: true })
+    try {
+        // Get all match IDs for this session first
+        const { results: matchIds } = await c.env.DB.prepare(
+            'SELECT id FROM matches WHERE session_id = ?'
+        ).bind(sessionId).all<{ id: number }>()
+
+        if (matchIds && matchIds.length > 0) {
+            const ids = matchIds.map(m => m.id)
+
+            // Delete in order: match_events -> player_match_stats -> matches
+            await c.env.DB.batch([
+                c.env.DB.prepare(`DELETE FROM match_events WHERE match_id IN (${ids.join(',')})`),
+                c.env.DB.prepare(`DELETE FROM player_match_stats WHERE match_id IN (${ids.join(',')})`),
+                c.env.DB.prepare('DELETE FROM matches WHERE session_id = ?').bind(sessionId)
+            ])
+        }
+
+        return c.json({ success: true })
+    } catch (e: any) {
+        console.error('Delete matches failed:', e)
+        return c.json({ error: 'Delete failed', details: e?.message }, 500)
+    }
 })
 
 // Regen Matches (Rotation)
@@ -589,6 +708,98 @@ sessions.post('/:id/matches/autofill', async (c) => {
     }
 
     return c.json({ success: true, added: newMatches.length })
+})
+
+// POST /sessions/:id/analyze-teams - Analyze current team compositions
+sessions.post('/:id/analyze-teams', async (c) => {
+    const sessionId = c.req.param('id')
+
+    try {
+        // Get teams with players
+        const { results: teams } = await c.env.DB.prepare(`
+            SELECT t.id, t.name,
+                   GROUP_CONCAT(tm.player_id) as player_ids
+            FROM teams t
+            LEFT JOIN team_members tm ON tm.team_id = t.id
+            WHERE t.session_id = ?
+            GROUP BY t.id
+        `).bind(sessionId).all<{ id: number, name: string, player_ids: string }>()
+
+        if (!teams || teams.length === 0) {
+            return c.json({ error: 'No teams found' }, 400)
+        }
+
+        // Get all players with stats
+        const { results: allPlayers } = await c.env.DB.prepare('SELECT * FROM players').all<any>()
+        const playerMap = new Map(allPlayers?.map(p => [p.id, p]) || [])
+
+        // Analyze each team
+        const teamEmojis = ['⚡', '🔥', '💎', '🌟', '🚀']
+        const teamTypes = ['공격형', '밸런스형', '수비형', '피지컬형', '기술형']
+
+        for (let i = 0; i < teams.length; i++) {
+            const team = teams[i]
+            const playerIds = team.player_ids ? team.player_ids.split(',').map(Number) : []
+            const players = playerIds.map(id => playerMap.get(id)).filter(Boolean)
+
+            if (players.length === 0) continue
+
+            // Calculate team stats
+            let attack = 0, defense = 0, midfield = 0, physical = 0
+            players.forEach((p: any) => {
+                attack += (p.shooting || 50) + (p.offball_run || 50)
+                defense += (p.intercept || 50) + (p.marking || 50)
+                midfield += (p.passing || 50) + (p.ball_keeping || 50)
+                physical += (p.stamina || 50) + (p.speed || 50)
+            })
+
+            const n = players.length
+            attack = Math.round(attack / n / 2)
+            defense = Math.round(defense / n / 2)
+            midfield = Math.round(midfield / n / 2)
+            physical = Math.round(physical / n / 2)
+
+            // Determine type
+            let type = '밸런스형'
+            if (attack > defense + 10 && attack > midfield) type = '공격형'
+            else if (defense > attack + 10) type = '수비형'
+            else if (physical > 65) type = '피지컬형'
+            else if (midfield > 60) type = '기술형'
+
+            // Find key player (highest overall)
+            let keyPlayer = players[0]
+            players.forEach((p: any) => {
+                const overall = ((p.shooting || 50) + (p.passing || 50) + (p.stamina || 50)) / 3
+                const keyOverall = ((keyPlayer.shooting || 50) + (keyPlayer.passing || 50) + (keyPlayer.stamina || 50)) / 3
+                if (overall > keyOverall) keyPlayer = p
+            })
+
+            // Generate strategy
+            const strategies = [
+                `${type} 팀으로 ${attack > defense ? '공격적인 압박' : '안정적인 수비'}를 추천합니다.`,
+                `핵심 선수 ${keyPlayer?.name || '미정'}를 중심으로 경기를 풀어가세요.`,
+                `팀 평균 능력치: 공격 ${attack}, 수비 ${defense}, 미드 ${midfield}`
+            ]
+
+            // Save to team
+            const scoreStats = JSON.stringify({
+                emoji: teamEmojis[i % teamEmojis.length],
+                type,
+                strategy: strategies[0],
+                keyPlayer: keyPlayer?.name || '미정',
+                keyPlayerReason: `팀 내 최고 능력치`,
+                attack, defense, midfield, physical
+            })
+
+            await c.env.DB.prepare('UPDATE teams SET score_stats = ? WHERE id = ?')
+                .bind(scoreStats, team.id).run()
+        }
+
+        return c.json({ success: true, analyzed: teams.length })
+    } catch (e: any) {
+        console.error('Team analysis failed:', e)
+        return c.json({ error: 'Analysis failed', details: e?.message }, 500)
+    }
 })
 
 export default sessions
